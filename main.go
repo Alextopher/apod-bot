@@ -3,12 +3,16 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
+	bolt "go.etcd.io/bbolt"
 )
 
-var apod *APOD
+var (
+	apod *APOD
+)
 
 func main() {
 	godotenv.Load()
@@ -22,38 +26,57 @@ func main() {
 		return
 	}
 
-	apod = &APOD{
-		key: apodToken,
-	}
-
 	// Create a new Discord session using the provided bot token.
-	dg, err := discordgo.New("Bot " + discordToken)
+	session, err := discordgo.New("Bot " + discordToken)
 	if err != nil {
 		fmt.Println("Error creating Discord session: ", err)
 		return
 	}
 
-	// Wait until the bot is ready.
 	ch := make(chan struct{})
-	dg.AddHandler(func(s *discordgo.Session, event *discordgo.Ready) {
+	session.AddHandler(func(s *discordgo.Session, event *discordgo.Ready) {
 		fmt.Println("Bot is ready.")
 		ch <- struct{}{}
 	})
 
-	dg.Open()
-	<-ch
+	session.Open()
 
-	_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, "", commands)
+	// open the bolt key value store
+	db, err := bolt.Open("./apod.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+
 	if err != nil {
-		fmt.Println("Error overwriting commands: ", err)
+		fmt.Println("Error opening bolt db: ", err)
+		return
 	}
+	defer db.Close()
+
+	// create the schedule bucket
+	db.Update(func(tx *bolt.Tx) error {
+		tx.CreateBucketIfNotExists([]byte("schedule"))
+		return nil
+	})
 
 	// Handle application commands
-	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if handler, ok := handlers[i.ApplicationCommandData().Name]; ok {
 			handler(s, i)
 		}
 	})
 
-	select {}
+	// Wait for the bot to be ready.
+	<-ch
+
+	// Update the bot's interactions
+	_, err = session.ApplicationCommandBulkOverwrite(session.State.User.ID, "", commands)
+	if err != nil {
+		fmt.Println("Error overwriting commands: ", err)
+	}
+
+	apod = &APOD{
+		key:     apodToken,
+		db:      db,
+		session: session,
+	}
+
+	apod.RunScheduler()
 }

@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/bwmarrin/discordgo v0.24.0
 	github.com/joho/godotenv v1.4.0
+	go.etcd.io/bbolt v1.3.6
 )
 
 require (
