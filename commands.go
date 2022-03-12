@@ -34,6 +34,11 @@ var commands = []*discordgo.ApplicationCommand{
 		Description: "Stop sending APODs.\n",
 		Type:        discordgo.ChatApplicationCommand,
 	},
+	{
+		Name:        "source",
+		Description: "Links to the source code for this bot.\n",
+		Type:        discordgo.ChatApplicationCommand,
+	},
 }
 
 var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate){
@@ -59,6 +64,9 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 	"stop": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		apod.Stop(i.Interaction.ChannelID)
 		sendMessage(s, i, "This channels scheduled astronomy picture of the days will no longer be sent.")
+	},
+	"source": func(s *discordgo.Session, ic *discordgo.InteractionCreate) {
+		sendMessage(s, ic, "https://github.com/Alextopher/apod-bot")
 	},
 }
 
