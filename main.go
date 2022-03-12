@@ -15,6 +15,7 @@ var (
 )
 
 func main() {
+	fmt.Println("Starting APOD bot...")
 	godotenv.Load()
 
 	// Load tokens from .env file.
@@ -42,7 +43,7 @@ func main() {
 	session.Open()
 
 	// open the bolt key value store
-	db, err := bolt.Open("./apod.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+	db, err := bolt.Open("./apod.db", 0600, &bolt.Options{Timeout: time.Second})
 
 	if err != nil {
 		fmt.Println("Error opening bolt db: ", err)
