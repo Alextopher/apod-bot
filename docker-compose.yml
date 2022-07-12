@@ -1,5 +1,0 @@
-services:
-  bot:
-    build: .
-    volumes:
-      - ./apod.db:/apod.db

@@ -136,6 +136,8 @@ func (apod *APOD) RunScheduler() {
 		return nil
 	})
 
+	fmt.Println(apod.schedule)
+
 	// Every hour on the hour check if we need to send an APOD message
 	for {
 		sleepUntilNextHour()
@@ -159,6 +161,8 @@ func (apod *APOD) RunScheduler() {
 
 		// Check each channel
 		for channelID, hourToSend := range apod.schedule {
+			fmt.Println("Checking channel", channelID, "hour", hourToSend)
+
 			// If the hour matches, send the message
 			if hour == hourToSend {
 				fmt.Println("Sending APOD message to " + channelID)
