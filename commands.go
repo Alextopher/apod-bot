@@ -52,6 +52,18 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 		sendEmbeds(s, i, today.ToEmbed())
 	},
 	"schedule": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		allowed, err := authorize(s, i)
+
+		if err != nil {
+			sendError(s, i, err)
+			return
+		}
+
+		if !allowed {
+			sendMessage(s, i, "You do not have permission to use this command.")
+			return
+		}
+
 		for _, option := range i.ApplicationCommandData().Options {
 			if option.Name == "hour" {
 				hour := int(option.Value.(float64))
@@ -62,12 +74,45 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 		}
 	},
 	"stop": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		allowed, err := authorize(s, i)
+
+		if err != nil {
+			sendError(s, i, err)
+			return
+		}
+
+		if !allowed {
+			sendMessage(s, i, "You do not have permission to use this command.")
+			return
+		}
+
 		apod.Stop(i.Interaction.ChannelID)
-		sendMessage(s, i, "This channels scheduled astronomy picture of the days will no longer be sent.")
+		sendMessage(s, i, "This channels scheduled astronomy picture of the day will no longer be sent.")
 	},
 	"source": func(s *discordgo.Session, ic *discordgo.InteractionCreate) {
 		sendMessage(s, ic, "https://github.com/Alextopher/apod-bot")
 	},
+}
+
+// As of right now a user must have "Manage Server" permission (or higher) to use the bot.
+const bitmask = discordgo.PermissionManageServer | discordgo.PermissionAll | discordgo.PermissionAdministrator
+
+// authorize is a helper funciton to check if the user is authorized to use the bot.
+func authorize(s *discordgo.Session, i *discordgo.InteractionCreate) (bool, error) {
+	// check
+	for _, id := range i.Interaction.Member.Roles {
+		// get the role info
+		role, err := s.State.Role(i.GuildID, id)
+		if err != nil {
+			return false, err
+		}
+
+		if role.Permissions&bitmask != 0 {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func sendMessage(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {

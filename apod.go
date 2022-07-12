@@ -136,8 +136,6 @@ func (apod *APOD) RunScheduler() {
 		return nil
 	})
 
-	fmt.Println(apod.schedule)
-
 	// Every hour on the hour check if we need to send an APOD message
 	for {
 		sleepUntilNextHour()
