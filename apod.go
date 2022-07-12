@@ -112,33 +112,33 @@ func (apod *APOD) Stop(channel string) {
 }
 
 func (apod *APOD) RunScheduler() {
-	// Map from channelID to hour of the day to send a message (in UTC)
-	apod.schedule = make(map[string]int)
-
-	// Get all the channels that have a scheduled APOD
-	apod.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("schedule"))
-		c := b.Cursor()
-
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			// Get the hour
-			hour, err := strconv.Atoi(string(v))
-			if err != nil {
-				return err
-			}
-
-			// Get the channel
-			channel := string(k)
-
-			apod.schedule[channel] = hour
-		}
-
-		return nil
-	})
-
 	// Every hour on the hour check if we need to send an APOD message
 	for {
 		sleepUntilNextHour()
+
+		// Map from channelID to hour of the day to send a message (in UTC)
+		apod.schedule = make(map[string]int)
+
+		// Get all the channels that have a scheduled APOD
+		apod.db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte("schedule"))
+			c := b.Cursor()
+
+			for k, v := c.First(); k != nil; k, v = c.Next() {
+				// Get the hour
+				hour, err := strconv.Atoi(string(v))
+				if err != nil {
+					return err
+				}
+
+				// Get the channel
+				channel := string(k)
+
+				apod.schedule[channel] = hour
+			}
+
+			return nil
+		})
 
 		// Get the current time
 		now := time.Now().UTC()
@@ -159,8 +159,6 @@ func (apod *APOD) RunScheduler() {
 
 		// Check each channel
 		for channelID, hourToSend := range apod.schedule {
-			fmt.Println("Checking channel", channelID, "hour", hourToSend)
-
 			// If the hour matches, send the message
 			if hour == hourToSend {
 				fmt.Println("Sending APOD message to " + channelID)

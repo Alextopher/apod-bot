@@ -23,7 +23,7 @@ func main() {
 	apodToken := os.Getenv("APOD_TOKEN")
 
 	if discordToken == "" || apodToken == "" {
-		fmt.Println("Please set DISCORD_TOKEN and APOD_TOKEN in .env file.")
+		fmt.Println("Please set DISCORD_TOKEN and APOD_TOKEN in the .env file.")
 		return
 	}
 
