@@ -79,5 +79,8 @@ func main() {
 		session: session,
 	}
 
+	// cache the current APOD response
+	apod.Today()
+
 	apod.RunScheduler()
 }

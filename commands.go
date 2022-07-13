@@ -17,6 +17,11 @@ var commands = []*discordgo.ApplicationCommand{
 		Type:        discordgo.ChatApplicationCommand,
 	},
 	{
+		Name:        "explanation",
+		Description: "Get the description of today's APOD.",
+		Type:        discordgo.ChatApplicationCommand,
+	},
+	{
 		Name:        "schedule",
 		Description: "Schedule when to send APODs.\n",
 		Type:        discordgo.ChatApplicationCommand,
@@ -44,7 +49,17 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 			return
 		}
 
-		sendEmbeds(s, i, today.ToEmbed())
+		embed, file := today.ToEmbed()
+		sendEmbed(s, i, []*discordgo.MessageEmbed{embed}, []*discordgo.File{file})
+	},
+	"explanation": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		today, err := apod.Today()
+		if err != nil {
+			sendError(s, i, err)
+			return
+		}
+
+		sendMessage(s, i, today.CreateExplaination())
 	},
 	"schedule": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		allowed, err := authorize(s, i)
@@ -133,11 +148,12 @@ func sendError(s *discordgo.Session, i *discordgo.InteractionCreate, e error) {
 	}
 }
 
-func sendEmbeds(s *discordgo.Session, i *discordgo.InteractionCreate, embeds ...*discordgo.MessageEmbed) {
+func sendEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, embeds []*discordgo.MessageEmbed, files []*discordgo.File) {
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Embeds: embeds,
+			Files:  files,
 		},
 	})
 

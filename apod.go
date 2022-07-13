@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -22,10 +25,12 @@ type APODResponse struct {
 	Thumbnail   string `json:"thumbnail_url"`
 	Copyright   string `json:"copyright"`
 	Service     string `json:"service_version"`
+
+	Image []byte
 }
 
 // Convert a APODResponse to an embed
-func (a APODResponse) ToEmbed() *discordgo.MessageEmbed {
+func (a APODResponse) ToEmbed() (*discordgo.MessageEmbed, *discordgo.File) {
 	embed := &discordgo.MessageEmbed{
 		Title: a.Title,
 		Color: 0xFF0000,
@@ -34,9 +39,13 @@ func (a APODResponse) ToEmbed() *discordgo.MessageEmbed {
 		},
 	}
 
+	// The filename of the image is the last part of the URL
+	parts := strings.Split(a.HDURL, "/")
+	filename := parts[len(parts)-1]
+
 	if a.MediaType == "image" {
 		embed.Image = &discordgo.MessageEmbedImage{
-			URL: a.HDURL,
+			URL: fmt.Sprintf("attachment://%s", filename),
 		}
 	} else {
 		embed.Video = &discordgo.MessageEmbedVideo{
@@ -44,7 +53,14 @@ func (a APODResponse) ToEmbed() *discordgo.MessageEmbed {
 		}
 	}
 
-	return embed
+	return embed, &discordgo.File{
+		Name:   filename,
+		Reader: bytes.NewReader(a.Image),
+	}
+}
+
+func (a APODResponse) CreateExplaination() string {
+	return fmt.Sprintf("_%s_\n> %s", a.Title, a.Explanation)
 }
 
 type APOD struct {
@@ -86,10 +102,29 @@ func (a *APOD) Today() (APODResponse, error) {
 		return response, err
 	}
 
+	// If the response is an image, download it
+	if response.MediaType == "image" {
+		response.Image, err = downloadImage(response.HDURL)
+		if err != nil {
+			return response, err
+		}
+
+		fmt.Println("Downloaded image", len(response.Image))
+	}
+
 	// Cache the response
 	a.cache = response
 
 	return response, nil
+}
+
+func downloadImage(url string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return ioutil.ReadAll(resp.Body)
 }
 
 // Schedule adds a job to the scheduler to send an APOD message to a channel
@@ -112,6 +147,8 @@ func (apod *APOD) Stop(channel string) {
 }
 
 func (apod *APOD) RunScheduler() {
+	fmt.Println("Starting APOD scheduler")
+
 	// Every hour on the hour check if we need to send an APOD message
 	for {
 		sleepUntilNextHour()
@@ -155,7 +192,7 @@ func (apod *APOD) RunScheduler() {
 			continue
 		}
 
-		embed := res.ToEmbed()
+		embed, image := res.ToEmbed()
 
 		// Check each channel
 		for channelID, hourToSend := range apod.schedule {
@@ -164,7 +201,10 @@ func (apod *APOD) RunScheduler() {
 				fmt.Println("Sending APOD message to " + channelID)
 
 				// Send the message to the channel
-				_, err = apod.session.ChannelMessageSendEmbed(channelID, embed)
+				_, err = apod.session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+					Embeds: []*discordgo.MessageEmbed{embed},
+					Files:  []*discordgo.File{image},
+				})
 				if err != nil {
 					fmt.Println("Error sending message:", err)
 					delete(apod.schedule, channelID) // Remove the channel from the schedule
