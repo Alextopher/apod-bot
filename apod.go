@@ -29,8 +29,12 @@ type APODResponse struct {
 	Image []byte
 }
 
+func (a *APODResponse) String() string {
+	return fmt.Sprintf("Title: %s\nDate: %s\nURL: %s\nHDURL: %s\nMediaType: %s\nExplanation: %s\nThumbnail: %s\nCopyright: %s\nService: %s", a.Title, a.Date, a.URL, a.HDURL, a.MediaType, a.Explanation, a.Thumbnail, a.Copyright, a.Service)
+}
+
 // Convert a APODResponse to an embed
-func (a APODResponse) ToEmbed() (*discordgo.MessageEmbed, *discordgo.File) {
+func (a *APODResponse) ToEmbed() (*discordgo.MessageEmbed, *discordgo.File) {
 	embed := &discordgo.MessageEmbed{
 		Title: a.Title,
 		Color: 0xFF0000,
@@ -39,17 +43,30 @@ func (a APODResponse) ToEmbed() (*discordgo.MessageEmbed, *discordgo.File) {
 		},
 	}
 
+	var url string
+	if a.MediaType == "image" {
+		if a.HDURL != "" {
+			url = a.HDURL
+		} else {
+			url = a.URL
+		}
+	} else if a.MediaType == "video" {
+		url = a.Thumbnail
+	}
+
 	// The filename of the image is the last part of the URL
-	parts := strings.Split(a.HDURL, "/")
+	parts := strings.Split(url, "/")
 	filename := parts[len(parts)-1]
 
-	if a.MediaType == "image" {
-		embed.Image = &discordgo.MessageEmbedImage{
-			URL: fmt.Sprintf("attachment://%s", filename),
-		}
-	} else {
-		embed.Video = &discordgo.MessageEmbedVideo{
-			URL: a.HDURL,
+	embed.Image = &discordgo.MessageEmbedImage{
+		URL: fmt.Sprintf("attachment://%s", filename),
+	}
+
+	if a.MediaType == "video" {
+		if a.HDURL != "" {
+			embed.Description = "VIDEO: " + a.HDURL
+		} else {
+			embed.Description = "VIDEO: " + a.URL
 		}
 	}
 
@@ -59,8 +76,14 @@ func (a APODResponse) ToEmbed() (*discordgo.MessageEmbed, *discordgo.File) {
 	}
 }
 
-func (a APODResponse) CreateExplaination() string {
-	return fmt.Sprintf("_%s_\n> %s", a.Title, a.Explanation)
+func (a *APODResponse) CreateExplaination() string {
+	if a.MediaType == "image" {
+		return fmt.Sprintf("_%s_\n> %s", a.Title, a.Explanation)
+	} else if a.MediaType == "video"{
+		return fmt.Sprintf("_%s_\n%s\n> %s", a.Title, a.URL, a.Explanation)
+	}
+
+	return ""
 }
 
 type APOD struct {
@@ -110,6 +133,13 @@ func (a *APOD) Today() (APODResponse, error) {
 		}
 
 		fmt.Println("Downloaded image", len(response.Image))
+	} else {
+		response.Image, err = downloadImage(response.Thumbnail)
+		if err != nil {
+			return response, err
+		}
+
+		fmt.Println("Downloaded thumbnail", len(response.Image))
 	}
 
 	// Cache the response
