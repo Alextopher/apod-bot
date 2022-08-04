@@ -29,12 +29,12 @@ func resizeImage(img []byte, max_size int) ([]byte, error) {
 
 	// Downsample the image many times and pick the best one
 	width := m.Bounds().Dx()
-	
+
 	// Choose 10 widths to try
 	widths := []int{(width * 9) / 10, (width * 8) / 10, (width * 7) / 10, (width * 6) / 10, (width * 5) / 10, (width * 4) / 10, (width * 3) / 10, (width * 2) / 10, (width * 1) / 10, width}
 	images := make(chan []byte, len(widths))
 
-    wg := new(sync.WaitGroup)
+	wg := new(sync.WaitGroup)
 
 	// Start a goroutine for each width
 	for _, w := range widths {

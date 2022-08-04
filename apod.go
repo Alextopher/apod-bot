@@ -80,7 +80,7 @@ func (a *APODResponse) ToEmbed() (*discordgo.MessageEmbed, *discordgo.File) {
 func (a *APODResponse) CreateExplaination() string {
 	if a.MediaType == "image" {
 		return fmt.Sprintf("_%s_\n> %s", a.Title, a.Explanation)
-	} else if a.MediaType == "video"{
+	} else if a.MediaType == "video" {
 		return fmt.Sprintf("_%s_\n%s\n> %s", a.Title, a.URL, a.Explanation)
 	}
 

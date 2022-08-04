@@ -55,7 +55,7 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 		})
 		if err != nil {
 			fmt.Println("Error responding to interaction: ", err)
-		}		
+		}
 
 		embed, file := today.ToEmbed()
 		sendEmbed(s, i.Interaction, []*discordgo.MessageEmbed{embed}, []*discordgo.File{file})
@@ -66,7 +66,7 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 			sendError(s, i, err)
 			return
 		}
-		
+
 		sendMessage(s, i, today.CreateExplaination())
 	},
 	"schedule": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -158,8 +158,8 @@ func sendError(s *discordgo.Session, i *discordgo.InteractionCreate, e error) {
 
 func sendEmbed(s *discordgo.Session, i *discordgo.Interaction, embeds []*discordgo.MessageEmbed, files []*discordgo.File) {
 	_, err := s.InteractionResponseEdit(i, &discordgo.WebhookEdit{
-		Embeds:          embeds,
-		Files:           files,
+		Embeds: embeds,
+		Files:  files,
 	})
 
 	if err != nil {
