@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"image"
-	"image/png"
+	"image/jpeg"
 	"io"
 	"net/http"
 	"sync"
 
-	_ "image/jpeg"
+	_ "image/png"
 
 	"golang.org/x/image/draw"
 )
@@ -48,7 +48,9 @@ func resizeImage(img []byte, max_size int) ([]byte, error) {
 
 			// Encode the image
 			buf := new(bytes.Buffer)
-			if err := png.Encode(buf, resized); err != nil {
+			if err := jpeg.Encode(buf, resized, &jpeg.Options{
+				Quality: 100,
+			}); err != nil {
 				fmt.Println("Could not encode image")
 			} else {
 				images <- buf.Bytes()
@@ -90,7 +92,12 @@ func downloadImage(url string) ([]byte, error) {
 
 	// If the image is too large reformat it to a smaller size
 	if len(bytes) > MAX_IMAGE_SIZE {
-		return resizeImage(bytes, MAX_IMAGE_SIZE)
+		img, err := resizeImage(bytes, MAX_IMAGE_SIZE)
+		if err != nil {
+			return nil, err
+		}
+
+		return img, nil
 	}
 
 	return bytes, nil

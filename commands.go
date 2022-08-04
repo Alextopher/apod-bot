@@ -49,8 +49,16 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 			return
 		}
 
+		// Let the user know we are working on it.
+		err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+		})
+		if err != nil {
+			fmt.Println("Error responding to interaction: ", err)
+		}		
+
 		embed, file := today.ToEmbed()
-		sendEmbed(s, i, []*discordgo.MessageEmbed{embed}, []*discordgo.File{file})
+		sendEmbed(s, i.Interaction, []*discordgo.MessageEmbed{embed}, []*discordgo.File{file})
 	},
 	"explanation": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		today, err := apod.Today()
@@ -58,7 +66,7 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 			sendError(s, i, err)
 			return
 		}
-
+		
 		sendMessage(s, i, today.CreateExplaination())
 	},
 	"schedule": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -148,13 +156,10 @@ func sendError(s *discordgo.Session, i *discordgo.InteractionCreate, e error) {
 	}
 }
 
-func sendEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, embeds []*discordgo.MessageEmbed, files []*discordgo.File) {
-	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Embeds: embeds,
-			Files:  files,
-		},
+func sendEmbed(s *discordgo.Session, i *discordgo.Interaction, embeds []*discordgo.MessageEmbed, files []*discordgo.File) {
+	_, err := s.InteractionResponseEdit(i, &discordgo.WebhookEdit{
+		Embeds:          embeds,
+		Files:           files,
 	})
 
 	if err != nil {
