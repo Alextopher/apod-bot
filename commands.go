@@ -39,6 +39,11 @@ var commands = []*discordgo.ApplicationCommand{
 		Description: "Stop sending APODs.\n",
 		Type:        discordgo.ChatApplicationCommand,
 	},
+	{
+		Name: "link",
+		Description: "Get a link to today's APOD.\n",
+		Type: discordgo.ChatApplicationCommand,
+	},
 }
 
 var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate){
@@ -106,6 +111,10 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 
 		apod.Stop(i.Interaction.ChannelID)
 		sendMessage(s, i, "This channels scheduled astronomy picture of the day will no longer be sent.")
+	},
+	"link": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		// link is always "https://apod.nasa.gov/apod/"
+		sendMessage(s, i, "https://apod.nasa.gov/apod/")
 	},
 }
 
