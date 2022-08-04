@@ -7,6 +7,7 @@ import (
 	"image/jpeg"
 	"io"
 	"net/http"
+	"runtime"
 	"sync"
 
 	_ "image/png"
@@ -44,7 +45,7 @@ func resizeImage(img []byte, max_size int) ([]byte, error) {
 
 			// Resize the image
 			resized := image.NewRGBA(image.Rect(0, 0, w, height))
-			draw.BiLinear.Scale(resized, resized.Bounds(), m, m.Bounds(), draw.Over, nil)
+			draw.NearestNeighbor.Scale(resized, resized.Bounds(), m, m.Bounds(), draw.Over, nil)
 
 			// Encode the image
 			buf := new(bytes.Buffer)
@@ -93,6 +94,7 @@ func downloadImage(url string) ([]byte, error) {
 	// If the image is too large reformat it to a smaller size
 	if len(bytes) > MAX_IMAGE_SIZE {
 		img, err := resizeImage(bytes, MAX_IMAGE_SIZE)
+		runtime.GC()
 		if err != nil {
 			return nil, err
 		}
