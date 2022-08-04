@@ -6,6 +6,7 @@ require (
 	github.com/bwmarrin/discordgo v0.25.0
 	github.com/joho/godotenv v1.4.0
 	go.etcd.io/bbolt v1.3.6
+	golang.org/x/image v0.0.0-20220722155232-062f8c9fd539
 )
 
 require (

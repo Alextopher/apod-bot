@@ -34,14 +34,6 @@ func main() {
 		return
 	}
 
-	ch := make(chan struct{})
-	session.AddHandler(func(s *discordgo.Session, event *discordgo.Ready) {
-		fmt.Println("Bot is ready.")
-		ch <- struct{}{}
-	})
-
-	session.Open()
-
 	// open the bolt key value store
 	db, err := bolt.Open("./apod.db", 0600, &bolt.Options{Timeout: time.Second})
 
@@ -56,6 +48,26 @@ func main() {
 		tx.CreateBucketIfNotExists([]byte("schedule"))
 		return nil
 	})
+
+	apod = &APOD{
+		key:     apodToken,
+		db:      db,
+		session: session,
+	}
+
+	// cache the current APOD response
+	_, err = apod.Today()
+	if err != nil {
+		fmt.Println("Error caching APOD: ", err)
+	}
+
+	ch := make(chan struct{})
+	session.AddHandler(func(s *discordgo.Session, event *discordgo.Ready) {
+		fmt.Println("Bot is ready.")
+		ch <- struct{}{}
+	})
+
+	session.Open()
 
 	// Handle application commands
 	session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -72,15 +84,6 @@ func main() {
 	if err != nil {
 		fmt.Println("Error overwriting commands: ", err)
 	}
-
-	apod = &APOD{
-		key:     apodToken,
-		db:      db,
-		session: session,
-	}
-
-	// cache the current APOD response
-	apod.Today()
 
 	apod.RunScheduler()
 }

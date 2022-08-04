@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	_ "image/jpeg"
 
 	"github.com/bwmarrin/discordgo"
 	bolt "go.etcd.io/bbolt"
@@ -146,15 +147,6 @@ func (a *APOD) Today() (APODResponse, error) {
 	a.cache = response
 
 	return response, nil
-}
-
-func downloadImage(url string) ([]byte, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	return ioutil.ReadAll(resp.Body)
 }
 
 // Schedule adds a job to the scheduler to send an APOD message to a channel
