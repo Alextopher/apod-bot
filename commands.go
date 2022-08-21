@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -40,9 +41,9 @@ var commands = []*discordgo.ApplicationCommand{
 		Type:        discordgo.ChatApplicationCommand,
 	},
 	{
-		Name: "link",
+		Name:        "link",
 		Description: "Get a link to today's APOD.\n",
-		Type: discordgo.ChatApplicationCommand,
+		Type:        discordgo.ChatApplicationCommand,
 	},
 }
 
@@ -59,7 +60,7 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		})
 		if err != nil {
-			fmt.Println("Error responding to interaction: ", err)
+			log.Println("Error responding to interaction: ", err)
 		}
 
 		embed, file := today.ToEmbed()
@@ -148,7 +149,7 @@ func sendMessage(s *discordgo.Session, i *discordgo.InteractionCreate, content s
 	})
 
 	if err != nil {
-		fmt.Println("Error responding to interaction: ", err)
+		log.Println("Error responding to interaction: ", err)
 	}
 }
 
@@ -161,7 +162,7 @@ func sendError(s *discordgo.Session, i *discordgo.InteractionCreate, e error) {
 	})
 
 	if err != nil {
-		fmt.Println("Error responding to interaction: ", err)
+		log.Println("Error responding to interaction: ", err)
 	}
 }
 
@@ -172,6 +173,6 @@ func sendEmbed(s *discordgo.Session, i *discordgo.Interaction, embeds []*discord
 	})
 
 	if err != nil {
-		fmt.Println("Error responding to interaction: ", err)
+		log.Println("Error responding to interaction: ", err)
 	}
 }

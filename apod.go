@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -132,15 +133,11 @@ func (a *APOD) Today() (APODResponse, error) {
 		if err != nil {
 			return response, err
 		}
-
-		fmt.Println("Downloaded image", len(response.Image))
 	} else {
 		response.Image, err = downloadImage(response.Thumbnail)
 		if err != nil {
 			return response, err
 		}
-
-		fmt.Println("Downloaded thumbnail", len(response.Image))
 	}
 
 	// Cache the response
@@ -168,8 +165,35 @@ func (apod *APOD) Stop(channel string) {
 	})
 }
 
+// Checks that the bot has access to all the channels in the schedule
+func (apod *APOD) UpdateSchedule() {
+	apod.db.Update(func(tx *bolt.Tx) error {
+		count := 0
+
+		b := tx.Bucket([]byte("schedule"))
+		b.ForEach(func(k, v []byte) error {
+			channel := string(k)
+
+			// Check if the bot has access to the channel
+			_, err := apod.session.Channel(channel)
+			if err != nil {
+				b.Delete(k)
+				count++
+			}
+
+			return nil
+		})
+
+		if count > 0 {
+			log.Printf("Removed %d channels from the schedule\n", count)
+		}
+
+		return nil
+	})
+}
+
 func (apod *APOD) RunScheduler() {
-	fmt.Println("Starting APOD scheduler")
+	apod.UpdateSchedule()
 
 	// Every hour on the hour check if we need to send an APOD message
 	for {
@@ -205,12 +229,18 @@ func (apod *APOD) RunScheduler() {
 		// Get the hour of the day
 		hour := now.Hour()
 
-		fmt.Printf("Checking for APOD messages for hour %d...\n", hour)
-
 		// Prepare the message
 		res, err := apod.Today()
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
+
+			// try again in 1 minute
+			time.Sleep(time.Minute)
+			res, err = apod.Today()
+			if err != nil {
+				log.Println("Message prepare failed twice", err)
+			}
+
 			continue
 		}
 
@@ -220,7 +250,7 @@ func (apod *APOD) RunScheduler() {
 		for channelID, hourToSend := range apod.schedule {
 			// If the hour matches, send the message
 			if hour == hourToSend {
-				fmt.Println("Sending APOD message to " + channelID)
+				log.Println("Sending APOD message to " + channelID)
 
 				// Send the message to the channel
 				_, err = apod.session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
@@ -228,8 +258,7 @@ func (apod *APOD) RunScheduler() {
 					Files:  []*discordgo.File{image},
 				})
 				if err != nil {
-					fmt.Println("Error sending message:", err)
-					delete(apod.schedule, channelID) // Remove the channel from the schedule
+					log.Println("Error sending message:", err)
 				}
 			}
 		}

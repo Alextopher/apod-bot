@@ -6,21 +6,25 @@ A [go](https://go.dev/) discord bot that fetches and posts [Astronomy Picture of
 
 - Scheduled posting with `/schedule` and `/stop`
 - Manually posting today's picture with `/today`
+- Get more information with `/explanation`
 - All Astronomy Picture of the Day API calls are appropriately cached.
 
 ## Usage
 
-**Currently, the bot is in development. Use at your own risk.**
-
+1. Invite the bot to your server.
 <https://discord.com/api/oauth2/authorize?client_id=952282891910512663&permissions=18432&scope=applications.commands%20bot>
+
+2. Go to the channel you want APOD messages posted.
+
+3. Call `/schedule <hour UTC>` with the hour you want APOD messages to be sent.
 
 ## Development
 
-`APOD_TOKEN` token and `DISCORD_TOKEN` are passed in as environment variables. These may be set in a `.env` file like so:
+`APOD_TOKEN` and `DISCORD_TOKEN` are required as environment variables. These are set in a `.env` file like so:
 
 ```text
 APOD_TOKEN=<token>
 DISCORD_TOKEN=<token>
 ```
 
-To learn more about discord bot development, visit [discord developers](https://discord.com/developers/docs/intro) docs](https://discord.com/developers/docs/intro). To create a NASA API token visit [api.nasa.gov](https://api.nasa.gov/index.html#authentication).
+To learn more about discord bot development, visit [discord developers](https://discord.com/developers/docs/intro) docs](<https://discord.com/developers/docs/intro>). To create a NASA API token visit [api.nasa.gov](https://api.nasa.gov/index.html#authentication).

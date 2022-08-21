@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/jpeg"
 	"io"
+	"log"
 	"net/http"
 	"runtime"
 	"sync"
@@ -23,7 +24,7 @@ func resizeImage(img []byte, max_size int) ([]byte, error) {
 	// Decode the image
 	m, format, err := image.Decode(bytes.NewReader(img))
 	if err != nil {
-		fmt.Println("Can not decode", format, "images")
+		log.Println("Can not decode", format, "images")
 		return nil, err
 	}
 
@@ -52,7 +53,7 @@ func resizeImage(img []byte, max_size int) ([]byte, error) {
 			if err := jpeg.Encode(buf, resized, &jpeg.Options{
 				Quality: 100,
 			}); err != nil {
-				fmt.Println("Could not encode image")
+				log.Println("Could not encode image")
 			} else {
 				images <- buf.Bytes()
 			}
