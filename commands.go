@@ -167,7 +167,7 @@ func sendError(s *discordgo.Session, i *discordgo.InteractionCreate, e error) {
 
 func sendEmbed(s *discordgo.Session, i *discordgo.Interaction, embeds []*discordgo.MessageEmbed, files []*discordgo.File) {
 	_, err := s.InteractionResponseEdit(i, &discordgo.WebhookEdit{
-		Embeds: embeds,
+		Embeds: &embeds,
 		Files:  files,
 	})
 
