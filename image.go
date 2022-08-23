@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"runtime"
-	"sync"
 
 	_ "image/png"
 
@@ -35,34 +34,25 @@ func resizeImage(img []byte, max_size int) ([]byte, error) {
 	widths := []int{(width * 9) / 10, (width * 8) / 10, (width * 7) / 10, (width * 6) / 10, (width * 5) / 10, (width * 4) / 10, (width * 3) / 10, (width * 2) / 10, (width * 1) / 10, width}
 	images := make(chan []byte, len(widths))
 
-	wg := new(sync.WaitGroup)
-
 	// Start a goroutine for each width
 	for _, w := range widths {
-		wg.Add(1)
-		go func(w int) {
-			// Calculate the height of the image
-			height := int(m.Bounds().Dy() * w / m.Bounds().Dx())
+		// Calculate the height of the image
+		height := int(m.Bounds().Dy() * w / m.Bounds().Dx())
 
-			// Resize the image
-			resized := image.NewRGBA(image.Rect(0, 0, w, height))
-			draw.NearestNeighbor.Scale(resized, resized.Bounds(), m, m.Bounds(), draw.Over, nil)
+		// Resize the image
+		resized := image.NewRGBA(image.Rect(0, 0, w, height))
+		draw.NearestNeighbor.Scale(resized, resized.Bounds(), m, m.Bounds(), draw.Over, nil)
 
-			// Encode the image
-			buf := new(bytes.Buffer)
-			if err := jpeg.Encode(buf, resized, &jpeg.Options{
-				Quality: 100,
-			}); err != nil {
-				log.Println("Could not encode image")
-			} else {
-				images <- buf.Bytes()
-			}
-
-			wg.Done()
-		}(w)
+		// Encode the image
+		buf := new(bytes.Buffer)
+		if err := jpeg.Encode(buf, resized, &jpeg.Options{
+			Quality: 100,
+		}); err != nil {
+			log.Println("Could not encode image")
+		} else {
+			images <- buf.Bytes()
+		}
 	}
-
-	wg.Wait()
 
 	// Find the largest image that is still smaller than max_size
 	var best []byte
