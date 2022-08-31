@@ -2,6 +2,8 @@
 
 A [go](https://go.dev/) discord bot that fetches and posts [Astronomy Picture of the Day](https://apod.nasa.gov/apod/).
 
+![](./example.png)
+
 ## Features
 
 - Scheduled posting with `/schedule` and `/stop`
