@@ -91,7 +91,7 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 		for _, option := range i.ApplicationCommandData().Options {
 			if option.Name == "hour" {
 				hour := int(option.Value.(float64))
-				apod.Schedule(i.Interaction.ChannelID, hour)
+				apod.Schedule(i.ChannelID, hour)
 				sendMessage(s, i, fmt.Sprintf("Astronomy picture of the day will be sent daily at %d:00 UTC. Use `/stop` to stop", hour))
 				return
 			}
@@ -110,7 +110,7 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 			return
 		}
 
-		apod.Stop(i.Interaction.ChannelID)
+		apod.Stop(i.ChannelID)
 		sendMessage(s, i, "This channels scheduled astronomy picture of the day will no longer be sent.")
 	},
 	"link": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -125,7 +125,7 @@ const bitmask = discordgo.PermissionManageServer | discordgo.PermissionAll | dis
 // authorize is a helper funciton to check if the user is authorized to use the bot.
 func authorize(s *discordgo.Session, i *discordgo.InteractionCreate) (bool, error) {
 	// check
-	for _, id := range i.Interaction.Member.Roles {
+	for _, id := range i.Member.Roles {
 		// get the role info
 		role, err := s.State.Role(i.GuildID, id)
 		if err != nil {

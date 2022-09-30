@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -96,6 +97,7 @@ func main() {
 	// Handle application commands
 	session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if handler, ok := handlers[i.ApplicationCommandData().Name]; ok {
+			fmt.Println(i.ApplicationCommandData().Name);
 			handler(s, i)
 		}
 	})
