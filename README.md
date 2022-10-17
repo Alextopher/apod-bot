@@ -1,6 +1,6 @@
 # apod-bot
 
-A [go](https://go.dev/) discord bot that fetches and posts [Astronomy Picture of the Day](https://apod.nasa.gov/apod/).
+A discord bot written in [go](https://go.dev/) that fetches and posts NASA's [Astronomy Picture of the Day](https://apod.nasa.gov/apod/).
 
 ![](./example.png)
 
@@ -29,4 +29,4 @@ APOD_TOKEN=<token>
 DISCORD_TOKEN=<token>
 ```
 
-To learn more about discord bot development, visit [discord developers](https://discord.com/developers/docs/intro) docs](<https://discord.com/developers/docs/intro>). To create a NASA API token visit [api.nasa.gov](https://api.nasa.gov/index.html#authentication).
+To learn more about discord bot development, visit [discord developers docs](https://discord.com/developers/docs/intro). To create a NASA API token visit [api.nasa.gov](https://api.nasa.gov/index.html#authentication).
