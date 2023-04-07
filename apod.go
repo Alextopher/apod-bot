@@ -43,7 +43,9 @@ func (a *APODResponse) ToEmbed() (*discordgo.MessageEmbed, *discordgo.File) {
 		Author: &discordgo.MessageEmbedAuthor{
 			Name: a.Copyright,
 		},
-		Description: fmt.Sprintf("[%s](https://apod.nasa.gov/apod/ap%s.html)", a.Date, strings.Replace(a.Date, "-", "", -1)),
+		// a.Date is in the format yyyy-mm-dd
+		// but the url format is apyymmdd
+		Description: fmt.Sprintf("[%s](https://apod.nasa.gov/apod/ap%s.html)", a.Date, strings.Replace(a.Date, "-", "", -1)[2:]),
 	}
 
 	var url string
