@@ -41,8 +41,8 @@ var commands = []*discordgo.ApplicationCommand{
 		Type:        discordgo.ChatApplicationCommand,
 	},
 	{
-		Name:        "link",
-		Description: "Get a link to today's APOD.\n",
+		Name:        "source",
+		Description: "Visit the bot's github repo",
 		Type:        discordgo.ChatApplicationCommand,
 	},
 }
@@ -73,7 +73,7 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 			return
 		}
 
-		sendMessage(s, i, today.CreateExplaination())
+		sendMessage(s, i, today.CreateExplanation())
 	},
 	"schedule": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		allowed, err := authorize(s, i)
@@ -84,7 +84,7 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 		}
 
 		if !allowed {
-			sendMessage(s, i, "You do not have permission to use this command.")
+			sendMessage(s, i, "You must have \"Manage Server\" permissions or higher.")
 			return
 		}
 
@@ -106,23 +106,22 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 		}
 
 		if !allowed {
-			sendMessage(s, i, "You do not have permission to use this command.")
+			sendMessage(s, i, "You must have \"Manage Server\" permissions or higher.")
 			return
 		}
 
 		apod.Stop(i.ChannelID)
 		sendMessage(s, i, "This channels scheduled astronomy picture of the day will no longer be sent.")
 	},
-	"link": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		// link is always "https://apod.nasa.gov/apod/"
-		sendMessage(s, i, "https://apod.nasa.gov/apod/")
+	"source": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		sendMessage(s, i, "https://github.com/Alextopher/apod-bot")
 	},
 }
 
 // As of right now a user must have "Manage Server" permission (or higher) to use the bot.
 const bitmask = discordgo.PermissionManageServer | discordgo.PermissionAll | discordgo.PermissionAdministrator
 
-// authorize is a helper funciton to check if the user is authorized to use the bot.
+// authorize is a helper function to check if the user is authorized to use the bot.
 func authorize(s *discordgo.Session, i *discordgo.InteractionCreate) (bool, error) {
 	// check
 	for _, id := range i.Member.Roles {

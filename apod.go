@@ -43,6 +43,7 @@ func (a *APODResponse) ToEmbed() (*discordgo.MessageEmbed, *discordgo.File) {
 		Author: &discordgo.MessageEmbedAuthor{
 			Name: a.Copyright,
 		},
+		Description: fmt.Sprintf("[%s](https://apod.nasa.gov/apod/ap%s.html)", a.Date, strings.Replace(a.Date, "-", "", -1)),
 	}
 
 	var url string
@@ -78,7 +79,7 @@ func (a *APODResponse) ToEmbed() (*discordgo.MessageEmbed, *discordgo.File) {
 	}
 }
 
-func (a *APODResponse) CreateExplaination() string {
+func (a *APODResponse) CreateExplanation() string {
 	if a.MediaType == "image" {
 		return fmt.Sprintf("_%s_\n> %s", a.Title, a.Explanation)
 	} else if a.MediaType == "video" {

@@ -2,7 +2,7 @@
 
 A discord bot written in [go](https://go.dev/) that fetches and posts NASA's [Astronomy Picture of the Day](https://apod.nasa.gov/apod/).
 
-![](./example.png)
+![:O](./example.png)
 
 ## Features
 
