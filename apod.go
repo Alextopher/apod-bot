@@ -35,7 +35,7 @@ func (a *APODResponse) String() string {
 	return fmt.Sprintf("Title: %s\nDate: %s\nURL: %s\nHDURL: %s\nMediaType: %s\nExplanation: %s\nThumbnail: %s\nCopyright: %s\nService: %s", a.Title, a.Date, a.URL, a.HDURL, a.MediaType, a.Explanation, a.Thumbnail, a.Copyright, a.Service)
 }
 
-// Convert a APODResponse to an embed
+// ToEmbed converts an APODResponse to an embed
 func (a *APODResponse) ToEmbed() (*discordgo.MessageEmbed, *discordgo.File) {
 	embed := &discordgo.MessageEmbed{
 		Title: a.Title,
@@ -81,6 +81,7 @@ func (a *APODResponse) ToEmbed() (*discordgo.MessageEmbed, *discordgo.File) {
 	}
 }
 
+// CreateExplanation creates a markdown formatted explanation of the day's APOD
 func (a *APODResponse) CreateExplanation() string {
 	if a.MediaType == "image" {
 		return fmt.Sprintf("_%s_\n> %s", a.Title, a.Explanation)
@@ -91,6 +92,10 @@ func (a *APODResponse) CreateExplanation() string {
 	return ""
 }
 
+// APOD is the bot's APOD API client
+// It holds the NASA API key, the database, and the Discord session
+//
+// It also caches the day's APOD response
 type APOD struct {
 	key     string
 	db      *bolt.DB
@@ -103,7 +108,7 @@ type APOD struct {
 	schedule map[string]int
 }
 
-// APOD uses the NASA API to get todays astronomy picture of the day
+// Today gets today's APOD from the NASA API
 func (a *APOD) Today() (APODResponse, error) {
 	const baseURL = "https://api.nasa.gov/planetary/apod?thumbs=true&concept_tags=true&hd=true&api_key="
 
@@ -156,8 +161,8 @@ func (a *APOD) Today() (APODResponse, error) {
 
 // Schedule adds a job to the scheduler to send an APOD message to a channel
 // at a specific hour of the day (in UTC)
-func (apod *APOD) Schedule(channel string, hour int) {
-	apod.db.Update(func(tx *bolt.Tx) error {
+func (a *APOD) Schedule(channel string, hour int) {
+	a.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("schedule"))
 		h := fmt.Sprintf("%d", hour)
 		b.Put([]byte(channel), []byte(h))
@@ -165,7 +170,8 @@ func (apod *APOD) Schedule(channel string, hour int) {
 	})
 }
 
-func (apod *APOD) Stop(channel string) {
+// Stop removes a server from the scheduler
+func (a *APOD) Stop(channel string) {
 	apod.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("schedule"))
 		b.Delete([]byte(channel))
@@ -173,8 +179,9 @@ func (apod *APOD) Stop(channel string) {
 	})
 }
 
-// Checks that the bot has access to all the channels in the schedule
-func (apod *APOD) UpdateSchedule() {
+// UpdateSchedule checks if the bot has access to the channels in the schedule
+// and removes any channels it doesn't have access to
+func (a *APOD) UpdateSchedule() {
 	apod.db.Update(func(tx *bolt.Tx) error {
 		count := 0
 
@@ -200,7 +207,9 @@ func (apod *APOD) UpdateSchedule() {
 	})
 }
 
-func (apod *APOD) RunScheduler() {
+// RunScheduler runs the scheduler, checking every hour on the hour if it needs
+// to send an APOD message
+func (a *APOD) RunScheduler() {
 	apod.UpdateSchedule()
 
 	// Every hour on the hour check if we need to send an APOD message

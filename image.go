@@ -15,11 +15,11 @@ import (
 	"golang.org/x/image/draw"
 )
 
-// MAX_IMAGE_SIZE is 8MB
-const MAX_IMAGE_SIZE = 8 * 1024 * 1024
+// MaxImageSize is 8MB
+const MaxImageSize = 8 * 1024 * 1024
 
 // resizeImage reads an image and resizes it to be close to max_size
-func resizeImage(img []byte, max_size int) ([]byte, error) {
+func resizeImage(img []byte, maxSize int) ([]byte, error) {
 	// Decode the image
 	m, format, err := image.Decode(bytes.NewReader(img))
 	if err != nil {
@@ -54,11 +54,11 @@ func resizeImage(img []byte, max_size int) ([]byte, error) {
 		}
 	}
 
-	// Find the largest image that is still smaller than max_size
+	// Find the largest image that is still smaller than maxSize
 	var best []byte
 	for i := 0; i < len(widths); i++ {
 		img := <-images
-		if len(img) < max_size && len(img) > len(best) {
+		if len(img) < maxSize && len(img) > len(best) {
 			best = img
 		}
 	}
@@ -83,8 +83,8 @@ func downloadImage(url string) ([]byte, error) {
 	}
 
 	// If the image is too large reformat it to a smaller size
-	if len(bytes) > MAX_IMAGE_SIZE {
-		img, err := resizeImage(bytes, MAX_IMAGE_SIZE)
+	if len(bytes) > MaxImageSize {
+		img, err := resizeImage(bytes, MaxImageSize)
 		runtime.GC()
 		if err != nil {
 			return nil, err
