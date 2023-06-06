@@ -120,6 +120,11 @@ func (a *APOD) Today() (APODResponse, error) {
 
 	// Get the JSON response from the API
 	resp, err := http.Get(baseURL + a.key)
+
+	// Check for error codes
+	if resp.StatusCode != http.StatusOK {
+		return response, fmt.Errorf("NASA API Failure: %s", resp.Status)
+	}
 	if err != nil {
 		return response, err
 	}

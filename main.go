@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -60,7 +59,6 @@ func main() {
 	_, err = apod.Today()
 	if err != nil {
 		log.Println("Error caching APOD: ", err)
-		return
 	}
 
 	// number of scheduled APODs
@@ -97,7 +95,7 @@ func main() {
 	// Handle application commands
 	session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if handler, ok := handlers[i.ApplicationCommandData().Name]; ok {
-			fmt.Println(i.ApplicationCommandData().Name)
+			log.Println("Handling command: ", i.ApplicationCommandData().Name)
 			handler(s, i)
 		}
 	})
