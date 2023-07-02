@@ -76,7 +76,7 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 		sendMessage(s, i, today.CreateExplanation())
 	},
 	"schedule": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		allowed, err := authorize(s, i)
+		allowed, err := authorize(s, i.Member)
 
 		if err != nil {
 			sendError(s, i, err)
@@ -98,7 +98,7 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 		}
 	},
 	"stop": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		allowed, err := authorize(s, i)
+		allowed, err := authorize(s, i.Member)
 
 		if err != nil {
 			sendError(s, i, err)
@@ -119,14 +119,12 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 }
 
 // As of right now a user must have "Manage Server" permission (or higher) to use the bot.
-const bitmask = discordgo.PermissionManageServer | discordgo.PermissionAll | discordgo.PermissionAdministrator
+const bitmask = discordgo.PermissionManageServer | discordgo.PermissionAdministrator
 
 // authorize is a helper function to check if the user is authorized to use the bot.
-func authorize(s *discordgo.Session, i *discordgo.InteractionCreate) (bool, error) {
-	// check
-	for _, id := range i.Member.Roles {
-		// get the role info
-		role, err := s.State.Role(i.GuildID, id)
+func authorize(s *discordgo.Session, member *discordgo.Member) (bool, error) {
+	for _, id := range member.Roles {
+		role, err := s.State.Role(member.GuildID, id)
 		if err != nil {
 			return false, err
 		}

@@ -211,8 +211,6 @@ func (a *APOD) UpdateSchedule() {
 // to send an APOD message
 func (a *APOD) RunScheduler() {
 	apod.UpdateSchedule()
-
-	// Every hour on the hour check if we need to send an APOD message
 	for {
 		sleepUntilNextHour()
 
@@ -241,24 +239,27 @@ func (a *APOD) RunScheduler() {
 		})
 
 		// Get the current time
-		now := time.Now().UTC()
+		hour := time.Now().UTC().Hour()
 
-		// Get the hour of the day
-		hour := now.Hour()
+		// Prepare the message with retries
+		var res APODResponse
+		var err error
+		backOff := time.Second
 
-		// Prepare the message
-		res, err := apod.Today()
-		if err != nil {
-			log.Println(err)
-
-			// try again in 1 minute
-			time.Sleep(time.Minute)
+		for {
 			res, err = apod.Today()
-			if err != nil {
-				log.Println("Message prepare failed twice", err)
+			if err == nil || backOff > time.Hour {
+				break
 			}
 
-			continue
+			log.Printf("Message prepare failed %s trying again in %s\n", err, backOff)
+			time.Sleep(backOff)
+			backOff *= 2
+		}
+
+		if err != nil {
+			log.Println("Message prepare failed after multiple retries", err)
+			return
 		}
 
 		embed, image := res.ToEmbed()
