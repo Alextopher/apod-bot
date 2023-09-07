@@ -16,32 +16,32 @@ type Bot struct {
 }
 
 // SetOwner sets the bot's owner
-func (b *Bot) SetOwner(ownerID string) {
+func (b *Bot) SetOwner(ownerID string) error {
 	owner, err := b.session.User(ownerID)
 	if err != nil {
-		log.Println("Error setting owner:", err)
-		return
+		return err
 	}
-
 	b.owner = owner
+	return nil
 }
 
 // Messages the bot's owner
-func (b *Bot) MessageOwner(msg string) {
+func (b *Bot) MessageOwner(msg string) error {
 	if b.owner == nil {
-		return
+		return nil
 	}
 
-	_, err := b.session.UserChannelCreate(b.owner.ID)
+	channel, err := b.session.UserChannelCreate(b.owner.ID)
 	if err != nil {
-		log.Println("Error creating DM channel:", err)
-		return
+		return err
 	}
 
-	_, err = b.session.ChannelMessageSend(b.owner.ID, msg)
+	_, err = b.session.ChannelMessageSend(channel.ID, msg)
 	if err != nil {
-		log.Println("Error sending message to owner:", err)
+		return err
 	}
+
+	return nil
 }
 
 // Schedule adds a job to the scheduler to send an APOD message to a channel

@@ -185,7 +185,15 @@ func (db *DB) RemoveIf(f func(string, int) bool) {
 	db.Lock()
 	for channelID, hour := range db.schedule {
 		if f(channelID, hour) {
-			delete(db.schedule, channelID)
+			event := &Event{
+				Time: time.Now(),
+				Type: EventTypeRemove,
+				Remove: &RemoveEvent{
+					ChannelID: channelID,
+				},
+			}
+			db.remove(event.Remove)
+			db.encoder.Encode(event)
 		}
 	}
 	db.Unlock()
