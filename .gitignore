@@ -1,3 +1,4 @@
 .env
 apod-bot
 apod.db
+apod.cache

@@ -27,6 +27,9 @@ A discord bot written in [go](https://go.dev/) that fetches and posts NASA's [As
 ```text
 APOD_TOKEN=<token>
 DISCORD_TOKEN=<token>
+
+# Optionally include an owner id to send logs to.
+OWNER_ID=<id>
 ```
 
 To learn more about discord bot development, visit [discord developers docs](https://discord.com/developers/docs/intro). To create a NASA API token visit [api.nasa.gov](https://api.nasa.gov/index.html#authentication).

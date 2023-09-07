@@ -14,21 +14,26 @@ var (
 var commands = []*discordgo.ApplicationCommand{
 	{
 		Name:        "today",
-		Description: "Get today's APOD.",
+		Description: "Get today's APOD",
+		Type:        discordgo.ChatApplicationCommand,
+	},
+	{
+		Name:        "random",
+		Description: "Get a random APOD",
 		Type:        discordgo.ChatApplicationCommand,
 	},
 	{
 		Name:        "explanation",
-		Description: "Get the description of today's APOD.",
+		Description: "Get the explanation of the last APOD",
 		Type:        discordgo.ChatApplicationCommand,
 	},
 	{
 		Name:        "schedule",
-		Description: "Schedule when to send APODs.\n",
+		Description: "Schedule when to send APODs\n",
 		Type:        discordgo.ChatApplicationCommand,
 		Options: []*discordgo.ApplicationCommandOption{{
 			Name:        "hour",
-			Description: "The hour (utc) to send the APODs.\n",
+			Description: "The hour (utc) to send the APODs\n",
 			Type:        discordgo.ApplicationCommandOptionInteger,
 			MinValue:    &zero,
 			MaxValue:    23,
@@ -47,42 +52,80 @@ var commands = []*discordgo.ApplicationCommand{
 	},
 }
 
-var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate){
-	"today": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		today, err := apod.Today()
-		if err != nil {
-			sendError(s, i, err)
-			return
-		}
+func (bot *Bot) handler(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	log.Println("Command: ", i.ApplicationCommandData().Name)
 
+	switch i.ApplicationCommandData().Name {
+	case "today":
 		// Let the user know we are working on it.
-		err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		})
 		if err != nil {
 			log.Println("Error responding to interaction: ", err)
 		}
 
-		embed, file := today.ToEmbed()
+		today, err := bot.apod.Today()
+		if err != nil {
+			sendError(s, i, err)
+			return
+		}
+
+		image, err := bot.apod.imageCache.GetOrSet(today.Date, today.DownloadImage)
+		if err != nil {
+			sendError(s, i, err)
+			return
+		}
+
+		embed, file := today.ToEmbed(image)
 		sendEmbed(s, i.Interaction, []*discordgo.MessageEmbed{embed}, []*discordgo.File{file})
-	},
-	"explanation": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		today, err := apod.Today()
+		bot.db.Sent(i.ChannelID, today.Date)
+	case "random":
+		// Let the user know we are working on it.
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+		})
+		if err != nil {
+			log.Println("Error responding to interaction: ", err)
+		}
+
+		random, err := bot.apod.Random()
 		if err != nil {
 			sendError(s, i, err)
 			return
 		}
 
-		sendMessage(s, i, today.CreateExplanation())
-	},
-	"schedule": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		allowed, err := authorize(s, i.Member)
-
+		image, err := random.DownloadImage()
 		if err != nil {
 			sendError(s, i, err)
 			return
 		}
 
+		embed, file := random.ToEmbed(image)
+		sendEmbed(s, i.Interaction, []*discordgo.MessageEmbed{embed}, []*discordgo.File{file})
+		bot.db.Sent(i.ChannelID, random.Date)
+	case "explanation":
+		// Get the last APOD sent to this channel
+		var apod APODResponse
+		var err error
+
+		if date, ok := bot.db.GetLast(i.ChannelID); ok {
+			apod, err = bot.apod.Get(date)
+			if err != nil {
+				sendError(s, i, err)
+				return
+			}
+		} else {
+			apod, err = bot.apod.Today()
+			if err != nil {
+				sendError(s, i, err)
+				return
+			}
+		}
+
+		sendMessage(s, i, apod.CreateExplanation())
+	case "schedule":
+		allowed := i.Interaction.Member.Permissions&bitmask != 0
 		if !allowed {
 			sendMessage(s, i, "You must have \"Manage Server\" permissions or higher.")
 			return
@@ -91,51 +134,38 @@ var handlers = map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 		for _, option := range i.ApplicationCommandData().Options {
 			if option.Name == "hour" {
 				hour := int(option.Value.(float64))
-				apod.Schedule(i.ChannelID, hour)
+				bot.db.Set(i.ChannelID, hour)
 				sendMessage(s, i, fmt.Sprintf("Astronomy picture of the day will be sent daily at %d:00 UTC. Use `/stop` to stop", hour))
 				return
 			}
 		}
-	},
-	"stop": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		allowed, err := authorize(s, i.Member)
-
-		if err != nil {
-			sendError(s, i, err)
-			return
-		}
-
+	case "stop":
+		allowed := i.Interaction.Member.Permissions&bitmask != 0
 		if !allowed {
 			sendMessage(s, i, "You must have \"Manage Server\" permissions or higher.")
 			return
 		}
 
-		apod.Stop(i.ChannelID)
+		bot.db.Remove(i.ChannelID)
 		sendMessage(s, i, "This channels scheduled astronomy picture of the day will no longer be sent.")
-	},
-	"source": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	case "source":
 		sendMessage(s, i, "https://github.com/Alextopher/apod-bot")
-	},
+	default:
+		log.Println("Unknown command: ", i.ApplicationCommandData().Name)
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Unknown command: " + i.ApplicationCommandData().Name,
+			},
+		})
+		if err != nil {
+			log.Println("Error responding to interaction: ", err)
+		}
+	}
 }
 
 // As of right now a user must have "Manage Server" permission (or higher) to use the bot.
 const bitmask = discordgo.PermissionManageServer | discordgo.PermissionAdministrator
-
-// authorize is a helper function to check if the user is authorized to use the bot.
-func authorize(s *discordgo.Session, member *discordgo.Member) (bool, error) {
-	for _, id := range member.Roles {
-		role, err := s.State.Role(member.GuildID, id)
-		if err != nil {
-			return false, err
-		}
-
-		if role.Permissions&bitmask != 0 {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
 
 func sendMessage(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
