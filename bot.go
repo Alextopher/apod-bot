@@ -84,7 +84,7 @@ func (b *Bot) RunScheduler() {
 
 		for {
 			res, err = b.apod.Today()
-			if err == nil || backOff > time.Hour {
+			if err == nil || backOff > time.Minute {
 				break
 			}
 
@@ -95,7 +95,7 @@ func (b *Bot) RunScheduler() {
 
 		if err != nil {
 			log.Println("Message prepare failed after multiple retries", err)
-			return
+			break
 		}
 
 		image, err := b.apod.imageCache.GetOrSet(res.Date, res.DownloadImage)
