@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"runtime"
 
+	_ "image/gif"
 	_ "image/png"
 )
 
@@ -21,11 +22,16 @@ func resizeImage(img []byte, maxSize int) ([]byte, error) {
 	// Decode the image
 	message, format, err := image.Decode(bytes.NewReader(img))
 	if err != nil {
-		log.Println("Can not decode", format, "images")
+		log.Println("Can not decode a '", format, "' image")
 		return nil, err
 	}
 
 	buf := new(bytes.Buffer)
+
+	// If the image is already small enough, return it
+	if len(img) < maxSize {
+		return img, nil
+	}
 
 	// Decrease the quality of the image until it fits within the max size
 	for quality := 100; quality > 0; quality -= 5 {
