@@ -57,25 +57,43 @@ func (a *APOD) Get(date string) (response APODResponse, err error) {
 
 // Today gets today's APOD from the NASA API
 func (a *APOD) Today() (APODResponse, error) {
-	date := time.Now().Format("2006-01-02")
-	return a.Get(date)
+	return a.Get(a.TodaysDate())
 }
 
-// Gets a random APOD from the NASA API
-func (a *APOD) Random() (APODResponse, error) {
+// TodaysDate return todays date in the format for apod.Get()
+func (a *APOD) TodaysDate() string {
+	return time.Now().Format("2006-01-02")
+}
+
+// RandomDate returns a random valid date for apod.Get()
+func (a *APOD) RandomDate() string {
 	// Must be after 1995-06-16 (first APOD) and before today
-	start, err := time.Parse("2006-01-02", "1995-06-16")
-	if err != nil {
-		return APODResponse{}, err
-	}
+	start := time.Date(1995, 6, 16, 0, 0, 0, 0, time.UTC)
 	end := time.Now()
 
 	// Get a random date between start and end
 	diff := end.Sub(start)
 	random := time.Duration(rand.Int63n(int64(diff)))
-	date := start.Add(random).Format("2006-01-02")
+	return start.Add(random).Format("2006-01-02")
+}
 
-	return a.Get(date)
+// Gets a random APOD from the NASA API
+func (a *APOD) Random() (APODResponse, error) {
+	return a.Get(a.RandomDate())
+}
+
+// Checks if a date is valid
+func (a *APOD) IsValidDate(date string) bool {
+	// Check if the date is in the correct format
+	_, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return false
+	}
+
+	// Check if the date is after 1995-06-16 (first APOD)
+	start := time.Date(1995, 6, 16, 0, 0, 0, 0, time.UTC)
+	d, _ := time.Parse("2006-01-02", date)
+	return d.After(start)
 }
 
 // APODResponse is a single JSON response from the APOD API.

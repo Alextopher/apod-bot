@@ -23,6 +23,17 @@ var commands = []*discordgo.ApplicationCommand{
 		Type:        discordgo.ChatApplicationCommand,
 	},
 	{
+		Name:        "specific",
+		Description: "Get a specific APOD",
+		Type:        discordgo.ChatApplicationCommand,
+		Options: []*discordgo.ApplicationCommandOption{{
+			Name:        "date",
+			Description: "In yyyy-mm-dd format",
+			Type:        discordgo.ApplicationCommandOptionString,
+			Required:    true,
+		}},
+	},
+	{
 		Name:        "explanation",
 		Description: "Get the explanation of the last APOD",
 		Type:        discordgo.ChatApplicationCommand,
@@ -52,58 +63,71 @@ var commands = []*discordgo.ApplicationCommand{
 	},
 }
 
+// Abstracts APOD Response commands "today", "random", and "date" using an
+// arbitrary function that returns an APODResponse and an error.
+func (bot *Bot) get(s *discordgo.Session, i *discordgo.InteractionCreate, date string) {
+	// Check if the date is valid and if not, send an error message.
+	if !bot.apod.IsValidDate(date) {
+		sendError(s, i, fmt.Errorf("\"%s\" is not a valid date. Use yyyy-mm-dd format, and choose a date after 1995-06-16", date))
+		return
+	}
+
+	// Let the user know we are working on it.
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
+
+	if err != nil {
+		log.Println("failed to prepare response: ", err)
+		finalizeMessage(s, i, "Sorry, something went wrong!")
+		return
+	}
+
+	today, err := bot.apod.Get(date)
+	if err != nil {
+		finalizeError(s, i, err)
+		return
+	}
+
+	image, err := bot.apod.imageCache.GetOrSet(today.Date, today.DownloadImage)
+	if err != nil {
+		finalizeError(s, i, err)
+		return
+	}
+
+	embed, file := today.ToEmbed(image)
+	_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		Embeds: &[]*discordgo.MessageEmbed{embed},
+		Files:  []*discordgo.File{file},
+	})
+
+	if err != nil {
+		log.Println("sendEmbed error responding to interaction: ", err)
+	}
+
+	bot.db.Sent(i.ChannelID, today.Date)
+}
+
+// handler handles application commands, switching on the command name
 func (bot *Bot) handler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	log.Println("Command: ", i.ApplicationCommandData().Name)
 
 	switch i.ApplicationCommandData().Name {
 	case "today":
-		// Let the user know we are working on it.
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
-		})
-		if err != nil {
-			log.Println("Error responding to interaction: ", err)
-		}
-
-		today, err := bot.apod.Today()
-		if err != nil {
-			sendError(s, i, err)
-			return
-		}
-
-		image, err := bot.apod.imageCache.GetOrSet(today.Date, today.DownloadImage)
-		if err != nil {
-			sendError(s, i, err)
-			return
-		}
-
-		embed, file := today.ToEmbed(image)
-		sendEmbed(s, i.Interaction, []*discordgo.MessageEmbed{embed}, []*discordgo.File{file})
-		bot.db.Sent(i.ChannelID, today.Date)
+		date := bot.apod.TodaysDate()
+		bot.get(s, i, date)
 	case "random":
-		// Let the user know we are working on it.
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
-		})
-		if err != nil {
-			log.Println("Error responding to interaction: ", err)
+		date := bot.apod.RandomDate()
+		bot.get(s, i, date)
+	case "specific":
+		var date string
+		for _, option := range i.ApplicationCommandData().Options {
+			if option.Name == "date" {
+				date = option.Value.(string)
+			}
 		}
 
-		random, err := bot.apod.Random()
-		if err != nil {
-			sendError(s, i, err)
-			return
-		}
-
-		image, err := random.DownloadImage()
-		if err != nil {
-			sendError(s, i, err)
-			return
-		}
-
-		embed, file := random.ToEmbed(image)
-		sendEmbed(s, i.Interaction, []*discordgo.MessageEmbed{embed}, []*discordgo.File{file})
-		bot.db.Sent(i.ChannelID, random.Date)
+		bot.get(s, i, date)
 	case "explanation":
 		// Get the last APOD sent to this channel
 		var apod APODResponse
@@ -159,7 +183,7 @@ func (bot *Bot) handler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			},
 		})
 		if err != nil {
-			log.Println("Error responding to interaction: ", err)
+			log.Println("failed to send unknown command warning: ", err)
 		}
 	}
 }
@@ -167,6 +191,7 @@ func (bot *Bot) handler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 // As of right now a user must have "Manage Server" permission (or higher) to use the bot.
 const bitmask = discordgo.PermissionManageServer | discordgo.PermissionAdministrator
 
+// sendMessage responds to a new interaction that hasn't been deferred
 func sendMessage(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -176,7 +201,19 @@ func sendMessage(s *discordgo.Session, i *discordgo.InteractionCreate, content s
 	})
 
 	if err != nil {
-		log.Println("Error responding to interaction: ", err)
+		log.Println("sendMessage error responding to interaction: ", err)
+	}
+}
+
+// finalizeMessage responds to a deferred interaction created with
+// "InteractionResponseDeferredChannelMessageWithSource"
+func finalizeMessage(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
+	_, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		Content: &content,
+	})
+
+	if err != nil {
+		log.Println("finalizeMessage error responding to interaction: ", err)
 	}
 }
 
@@ -185,21 +222,15 @@ func sendError(s *discordgo.Session, i *discordgo.InteractionCreate, e error) {
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Content: e.Error(),
+			Flags:   discordgo.MessageFlagsEphemeral,
 		},
 	})
 
 	if err != nil {
-		log.Println("Error responding to interaction: ", err)
+		log.Println("sendError error responding to interaction: ", err)
 	}
 }
 
-func sendEmbed(s *discordgo.Session, i *discordgo.Interaction, embeds []*discordgo.MessageEmbed, files []*discordgo.File) {
-	_, err := s.InteractionResponseEdit(i, &discordgo.WebhookEdit{
-		Embeds: &embeds,
-		Files:  files,
-	})
-
-	if err != nil {
-		log.Println("Error responding to interaction: ", err)
-	}
+func finalizeError(s *discordgo.Session, i *discordgo.InteractionCreate, e error) {
+	finalizeMessage(s, i, e.Error())
 }

@@ -2,7 +2,9 @@ package main
 
 // Verify that api commands are working as expected
 import (
+	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/joho/godotenv"
@@ -15,7 +17,15 @@ func CreateAPOD() *APOD {
 		key = os.Getenv("APOD_TOKEN")
 	}
 
-	return &APOD{key: key}
+	// Empty cache (reads and writes nothing)
+	cache, _ := NewAPODCache(strings.NewReader(""), io.Discard)
+
+	// Empty image cache (reads and writes nothing)
+	return &APOD{
+		key:        key,
+		cache:      cache,
+		imageCache: NewImageCache(),
+	}
 }
 
 // Verify that the default APOD request works
