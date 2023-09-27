@@ -89,13 +89,13 @@ func (bot *Bot) get(s *discordgo.Session, i *discordgo.InteractionCreate, date s
 		return
 	}
 
-	image, err := bot.apod.imageCache.GetOrSet(today.Date, today.DownloadImage)
+	image, format, err := GetOrSet(bot.apod.imageCache, today.Date, today.DownloadSizedImage)
 	if err != nil {
 		finalizeError(s, i, err)
 		return
 	}
 
-	embed, file := today.ToEmbed(image)
+	embed, file := today.ToEmbed(image, format)
 	_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 		Embeds: &[]*discordgo.MessageEmbed{embed},
 		Files:  []*discordgo.File{file},

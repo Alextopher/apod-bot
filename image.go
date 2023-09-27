@@ -8,71 +8,63 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"runtime"
 
 	_ "image/gif"
 	_ "image/png"
 )
 
-// MaxImageSize is 8MB
-const MaxImageSize = 8 * 1024 * 1024
+// DiscordMaxImageSize is the maximum size (in bytes) of an image that can be sent to Discord
+const DiscordMaxImageSize = 8 * 1024 * 1024
 
 // resizeImage reads an image and resizes it to be close to max_size
-func resizeImage(img []byte, maxSize int) ([]byte, error) {
+func resizeImage(img []byte, maxSize int) ([]byte, string, error) {
 	// Decode the image
 	message, format, err := image.Decode(bytes.NewReader(img))
 	if err != nil {
-		log.Println("Can not decode a '", format, "' image")
-		return nil, err
+		log.Println("failed to decode image")
+		return nil, format, err
 	}
 
 	buf := new(bytes.Buffer)
 
 	// If the image is already small enough, return it
 	if len(img) < maxSize {
-		return img, nil
+		return img, format, nil
 	}
 
 	// Decrease the quality of the image until it fits within the max size
 	for quality := 100; quality > 0; quality -= 5 {
+		buf.Reset()
 		err := jpeg.Encode(buf, message, &jpeg.Options{
 			Quality: quality,
 		})
 
 		if err != nil {
-			log.Println("Could not encode image")
+			log.Println("could not encode image")
+			return nil, "jpeg", err
 		}
 
 		if buf.Len() < maxSize {
-			return buf.Bytes(), nil
+			return buf.Bytes(), "jpeg", nil
 		}
 	}
 
-	return nil, errors.New("image can not be made to fit within max size")
+	return nil, "", errors.New("image can not be made to fit within max size")
 }
 
-func downloadImage(url string) ([]byte, error) {
+func downloadImage(url string) ([]byte, string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 
-	bytes, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	// If the image is too large reformat it to a smaller size
-	if len(bytes) > MaxImageSize {
-		img, err := resizeImage(bytes, MaxImageSize)
-		runtime.GC()
-		if err != nil {
-			return nil, err
-		}
-
-		return img, nil
-	}
-
-	return bytes, nil
+	// Verify that the image is valid
+	_, format, err := image.Decode(bytes.NewReader(body))
+	return body, format, err
 }

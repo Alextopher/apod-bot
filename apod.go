@@ -16,12 +16,10 @@ import (
 )
 
 // APOD is the bot's APOD API client
-//
-// It keeps a cache of the current day's APOD
 type APOD struct {
 	key        string
 	cache      *APODCache
-	imageCache *ImageCache
+	imageCache ImageCache
 }
 
 // Get the APOD response for a specific date
@@ -114,7 +112,9 @@ func (a *APODResponse) String() string {
 }
 
 // ToEmbed converts an APODResponse to an embed for Discord
-func (a *APODResponse) ToEmbed(image []byte) (*discordgo.MessageEmbed, *discordgo.File) {
+func (a *APODResponse) ToEmbed(image []byte, format string) (*discordgo.MessageEmbed, *discordgo.File) {
+	log.Println("Creating embed for", a.Date, "with format", format)
+
 	embed := &discordgo.MessageEmbed{
 		Title: a.Title,
 		Color: 0xFF0000,
@@ -126,21 +126,7 @@ func (a *APODResponse) ToEmbed(image []byte) (*discordgo.MessageEmbed, *discordg
 		Description: fmt.Sprintf("[%s](https://apod.nasa.gov/apod/ap%s.html)\n", a.Date, strings.Replace(a.Date, "-", "", -1)[2:]),
 	}
 
-	var url string
-	if a.MediaType == "image" {
-		if a.HDURL != "" {
-			url = a.HDURL
-		} else {
-			url = a.URL
-		}
-	} else if a.MediaType == "video" {
-		url = a.Thumbnail
-	}
-
-	// The filename of the image is the last part of the URL
-	parts := strings.Split(url, "/")
-	filename := parts[len(parts)-1]
-
+	filename := fmt.Sprintf("%s.%s", a.Date, format)
 	embed.Image = &discordgo.MessageEmbedImage{
 		URL: fmt.Sprintf("attachment://%s", filename),
 	}
@@ -164,15 +150,22 @@ func (a *APODResponse) CreateExplanation() string {
 	return fmt.Sprintf("_%s_\n> %s", a.Title, a.Explanation)
 }
 
-// Adds the image to the response
-func (a *APODResponse) DownloadImage() (image []byte, err error) {
+func (a *APODResponse) DownloadRawImage() ([]byte, string, error) {
 	log.Println("Downloading image for", a.Date)
 	if a.MediaType == "image" {
 		return downloadImage(a.HDURL)
-
 	} else {
 		return downloadImage(a.Thumbnail)
 	}
+}
+
+func (a *APODResponse) DownloadSizedImage() ([]byte, string, error) {
+	img, _, err := a.DownloadRawImage()
+	if err != nil {
+		return img, "", err
+	}
+
+	return resizeImage(img, DiscordMaxImageSize)
 }
 
 // Checks if the response is for today

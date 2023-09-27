@@ -98,8 +98,9 @@ func (b *Bot) RunScheduler() {
 			break
 		}
 
-		image, err := b.apod.imageCache.GetOrSet(res.Date, res.DownloadImage)
-		embed, file := res.ToEmbed(image)
+		image, format, err := GetOrSet(b.apod.imageCache, res.Date, res.DownloadSizedImage)
+
+		embed, file := res.ToEmbed(image, format)
 		hour := time.Now().UTC().Hour()
 		b.db.View(func(channelID string, hourToSend int) {
 			if hour == hourToSend {

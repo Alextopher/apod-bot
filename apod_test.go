@@ -10,11 +10,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func CreateAPOD() *APOD {
+func createAPITestAPOD() *APOD {
 	key, ok := os.LookupEnv("APOD_TOKEN")
 	if !ok {
 		godotenv.Load()
-		key = os.Getenv("APOD_TOKEN")
+		key, ok = os.LookupEnv("APOD_TOKEN")
+		if !ok {
+			key = "DEMO_KEY"
+		}
 	}
 
 	// Empty cache (reads and writes nothing)
@@ -24,13 +27,13 @@ func CreateAPOD() *APOD {
 	return &APOD{
 		key:        key,
 		cache:      cache,
-		imageCache: NewImageCache(),
+		imageCache: NewDiscardImageCache(),
 	}
 }
 
 // Verify that the default APOD request works
 func TestToday(t *testing.T) {
-	apod := CreateAPOD()
+	apod := createAPITestAPOD()
 
 	_, err := apod.Today()
 	if err != nil {
@@ -40,7 +43,7 @@ func TestToday(t *testing.T) {
 
 // Verify a particular date
 func TestGet(t *testing.T) {
-	apod := CreateAPOD()
+	apod := createAPITestAPOD()
 
 	resp, err := apod.Get("2021-07-01")
 	if err != nil {

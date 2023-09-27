@@ -34,7 +34,7 @@ channel ids, and command usage. Feel free to self-host it instead!
 APOD_TOKEN=<token>
 DISCORD_TOKEN=<token>
 
-# Optionally include an owner id to send certain events.
+# Optionally include an owner id to send certain events to.
 OWNER_ID=<id>
 ```
 

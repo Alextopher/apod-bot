@@ -56,12 +56,18 @@ func main() {
 		return
 	}
 
+	imageCache, err := NewDirectoryImageCache("images")
+	if err != nil {
+		log.Println("Error creating image cache: ", err)
+		return
+	}
+
 	bot := &Bot{
 		db: db,
 		apod: &APOD{
 			key:        apodToken,
 			cache:      cache,
-			imageCache: NewImageCache(),
+			imageCache: imageCache,
 		},
 		session: session,
 	}
