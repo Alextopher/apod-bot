@@ -15,13 +15,13 @@ import (
 type APODCache struct {
 	sync.RWMutex
 	encoder *json.Encoder
-	cache   map[string]APODResponse
+	cache   map[string]*APODResponse
 }
 
 // Helper function to create a new cache
 func NewAPODCache(r io.Reader, w io.Writer) (*APODCache, error) {
 	cache := &APODCache{
-		cache:   make(map[string]APODResponse),
+		cache:   make(map[string]*APODResponse),
 		encoder: json.NewEncoder(w),
 	}
 	if err := cache.Load(r); err != nil {
@@ -34,7 +34,7 @@ func NewAPODCache(r io.Reader, w io.Writer) (*APODCache, error) {
 func (c *APODCache) Load(r io.Reader) error {
 	dec := json.NewDecoder(r)
 	for {
-		var response APODResponse
+		var response *APODResponse
 		if err := dec.Decode(&response); err != nil {
 			if err == io.EOF {
 				break
@@ -47,7 +47,7 @@ func (c *APODCache) Load(r io.Reader) error {
 }
 
 // Adds a single day to the cache
-func (c *APODCache) Add(response APODResponse) error {
+func (c *APODCache) Add(response *APODResponse) error {
 	c.Lock()
 	c.cache[response.Date] = response
 	err := c.encoder.Encode(response)
@@ -56,39 +56,60 @@ func (c *APODCache) Add(response APODResponse) error {
 }
 
 // Adds multiple days to the cache
-func (c *APODCache) AddAll(responses []APODResponse) error {
+func (c *APODCache) AddAll(responses []*APODResponse) error {
 	c.Lock()
-	defer c.Unlock()
-
 	for _, response := range responses {
+		// If the cache already has the response, skip it
+		if _, ok := c.cache[response.Date]; ok {
+			continue
+		}
+
 		c.cache[response.Date] = response
 		if err := c.encoder.Encode(response); err != nil {
+			c.Unlock()
 			return err
 		}
 	}
+	c.Unlock()
 	return nil
 }
 
 // Writes the entire cache to a writer
 func (c *APODCache) WriteAll(w io.Writer) error {
 	c.RLock()
-	defer c.RUnlock()
-
 	encoder := json.NewEncoder(w)
 	for _, response := range c.cache {
 		if err := encoder.Encode(response); err != nil {
+			c.RUnlock()
 			return err
 		}
 	}
+	c.RUnlock()
 	return nil
 }
 
 // Gets a single day from the cache
-func (c *APODCache) Get(date string) (APODResponse, bool) {
+func (c *APODCache) Get(date string) (*APODResponse, bool) {
 	c.RLock()
 	response, ok := c.cache[date]
 	c.RUnlock()
 	return response, ok
+}
+
+// Has checks if a day is in the cache
+func (c *APODCache) Has(date string) bool {
+	c.RLock()
+	_, ok := c.cache[date]
+	c.RUnlock()
+	return ok
+}
+
+// Size returns the number of days in the cache
+func (c *APODCache) Size() int {
+	c.RLock()
+	size := len(c.cache)
+	c.RUnlock()
+	return size
 }
 
 // ImageCache is an interface for caching images by day.

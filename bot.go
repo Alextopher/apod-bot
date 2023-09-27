@@ -78,7 +78,7 @@ func (b *Bot) RunScheduler() {
 		sleepUntilNextHour()
 
 		// Prepare the message with retries
-		var res APODResponse
+		var res *APODResponse
 		var err error
 		backOff := time.Second
 

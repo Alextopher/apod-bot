@@ -130,7 +130,7 @@ func (bot *Bot) handler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		bot.get(s, i, date)
 	case "explanation":
 		// Get the last APOD sent to this channel
-		var apod APODResponse
+		var apod *APODResponse
 		var err error
 
 		if date, ok := bot.db.GetLast(i.ChannelID); ok {
