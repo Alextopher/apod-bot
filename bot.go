@@ -4,12 +4,13 @@ import (
 	"log"
 	"time"
 
+	"github.com/Alextopher/apod-bot/internal/apod"
 	"github.com/bwmarrin/discordgo"
 )
 
 type Bot struct {
 	db   *DB
-	apod *APOD
+	apod *apod.APOD
 
 	session *discordgo.Session
 	owner   *discordgo.User
@@ -78,7 +79,7 @@ func (b *Bot) RunScheduler() {
 		sleepUntilNextHour()
 
 		// Prepare the message with retries
-		var res *APODResponse
+		var res *apod.APODResponse
 		var err error
 		backOff := time.Second
 
@@ -98,9 +99,13 @@ func (b *Bot) RunScheduler() {
 			break
 		}
 
-		image, format, err := GetOrSet(b.apod.imageCache, res.Date, res.DownloadSizedImage)
+		wrapper, err := apod.GetOrSetImage(b.apod.ImageCache, res.Date, res.DownloadSizedImage)
+		if err != nil {
+			log.Println("Error downloading image:", err)
+			break
+		}
 
-		embed, file := res.ToEmbed(image, format)
+		embed, file := res.ToEmbed(wrapper.Bytes, wrapper.Format)
 		hour := time.Now().UTC().Hour()
 		b.db.View(func(channelID string, hourToSend int) {
 			if hour == hourToSend {

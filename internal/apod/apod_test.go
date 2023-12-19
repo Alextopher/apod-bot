@@ -1,4 +1,4 @@
-package main
+package apod
 
 // Verify that api commands are working as expected
 import (
@@ -27,7 +27,7 @@ func createAPITestAPOD() *APOD {
 	return &APOD{
 		key:        key,
 		cache:      cache,
-		imageCache: NewDiscardImageCache(),
+		ImageCache: NewNullImageCache(),
 	}
 }
 

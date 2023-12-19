@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/Alextopher/apod-bot/internal/apod"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -89,13 +90,13 @@ func (bot *Bot) get(s *discordgo.Session, i *discordgo.InteractionCreate, date s
 		return
 	}
 
-	image, format, err := GetOrSet(bot.apod.imageCache, today.Date, today.DownloadSizedImage)
+	wrapper, err := apod.GetOrSetImage(bot.apod.ImageCache, today.Date, today.DownloadSizedImage)
 	if err != nil {
 		finalizeError(s, i, err)
 		return
 	}
 
-	embed, file := today.ToEmbed(image, format)
+	embed, file := today.ToEmbed(wrapper.Bytes, wrapper.Format)
 	_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 		Embeds: &[]*discordgo.MessageEmbed{embed},
 		Files:  []*discordgo.File{file},
@@ -130,7 +131,7 @@ func (bot *Bot) handler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		bot.get(s, i, date)
 	case "explanation":
 		// Get the last APOD sent to this channel
-		var apod *APODResponse
+		var apod *apod.APODResponse
 		var err error
 
 		if date, ok := bot.db.GetLast(i.ChannelID); ok {

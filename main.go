@@ -8,6 +8,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
+
+	"github.com/Alextopher/apod-bot/internal/apod"
 )
 
 func main() {
@@ -50,25 +52,22 @@ func main() {
 		log.Println("Error opening apod.cache: ", err)
 		return
 	}
-	cache, err := NewAPODCache(cacheFile, cacheFile)
+
+	cache, err := apod.NewAPODCache(cacheFile, cacheFile)
 	if err != nil {
 		log.Println("Error creating cache: ", err)
 		return
 	}
 
-	imageCache, err := NewDirectoryImageCache("images")
+	imageCache, err := apod.NewDirectoryImageCache("images")
 	if err != nil {
 		log.Println("Error creating image cache: ", err)
 		return
 	}
 
 	bot := &Bot{
-		db: db,
-		apod: &APOD{
-			key:        apodToken,
-			cache:      cache,
-			imageCache: imageCache,
-		},
+		db:      db,
+		apod:    apod.NewAPOD(apodToken, cache, imageCache),
 		session: session,
 	}
 

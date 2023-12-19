@@ -1,4 +1,4 @@
-package main
+package apod
 
 import (
 	"bytes"
@@ -13,11 +13,21 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// APOD is the bot's APOD API client
+// APOD is a client for the NASA APOD API
+//
+// It has a cache for APOD responses and an image cache for images.
 type APOD struct {
 	key        string
-	cache      *APODCache
-	imageCache ImageCache
+	cache      APODCache
+	ImageCache ImageCache
+}
+
+func NewAPOD(key string, cache APODCache, imageCache ImageCache) *APOD {
+	return &APOD{
+		key:        key,
+		cache:      cache,
+		ImageCache: imageCache,
+	}
 }
 
 var (
@@ -199,6 +209,11 @@ func (a *APOD) IsValidDate(date string) bool {
 	return d.After(start)
 }
 
+// Access the image cache through the APOD client
+func (a *APOD) GetImage(day string) (*ImageWrapper, bool) {
+	return a.ImageCache.Get(day)
+}
+
 // APODResponse is a single JSON response from the APOD API.
 type APODResponse struct {
 	Title       string `json:"title"`
@@ -255,7 +270,7 @@ func (a *APODResponse) CreateExplanation() string {
 	return fmt.Sprintf("_%s_\n> %s", a.Title, a.Explanation)
 }
 
-func (a *APODResponse) DownloadRawImage() ([]byte, string, error) {
+func (a *APODResponse) DownloadRawImage() (*ImageWrapper, error) {
 	log.Println("Downloading image for", a.Date)
 	if a.MediaType == "image" {
 		return downloadImage(a.HDURL)
@@ -264,11 +279,12 @@ func (a *APODResponse) DownloadRawImage() ([]byte, string, error) {
 	}
 }
 
-func (a *APODResponse) DownloadSizedImage() ([]byte, string, error) {
-	img, _, err := a.DownloadRawImage()
+func (a *APODResponse) DownloadSizedImage() (*ImageWrapper, error) {
+	img, err := a.DownloadRawImage()
 	if err != nil {
-		return img, "", err
+		return img, err
 	}
 
-	return resizeImage(img, DiscordMaxImageSize)
+	err = img.Resize(DiscordMaxImageSize)
+	return img, err
 }
