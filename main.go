@@ -67,7 +67,7 @@ func main() {
 
 	bot := &Bot{
 		db:      db,
-		apod:    apod.NewAPOD(apodToken, cache, imageCache),
+		apod:    apod.NewClient(apodToken, cache, imageCache),
 		session: session,
 	}
 

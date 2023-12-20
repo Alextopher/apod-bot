@@ -18,11 +18,12 @@ import (
 // It has a cache for APOD responses and an image cache for images.
 type APOD struct {
 	key        string
-	cache      APODCache
+	cache      Cache
 	ImageCache ImageCache
 }
 
-func NewAPOD(key string, cache APODCache, imageCache ImageCache) *APOD {
+// NewClient creates a new APOD client
+func NewClient(key string, cache Cache, imageCache ImageCache) *APOD {
 	return &APOD{
 		key:        key,
 		cache:      cache,
@@ -31,11 +32,12 @@ func NewAPOD(key string, cache APODCache, imageCache ImageCache) *APOD {
 }
 
 var (
+	// ErrorDateNotFound is returned when the date is not found
 	ErrorDateNotFound = fmt.Errorf("date not found")
 )
 
 // Get the APOD response for a specific date
-func (a *APOD) Get(date string) (response *APODResponse, err error) {
+func (a *APOD) Get(date string) (response *Response, err error) {
 	// If the cache has the response, return that
 	if resp, ok := a.cache.Get(date); ok {
 		return resp, err
@@ -66,8 +68,8 @@ func (a *APOD) Get(date string) (response *APODResponse, err error) {
 	return response, nil
 }
 
-// Gets the APODs for a range of dates
-func (a *APOD) Range(start, end string) ([]*APODResponse, error) {
+// Range gets all APODs between two dates (inclusive)
+func (a *APOD) Range(start, end string) ([]*Response, error) {
 	log.Println("Getting APODs from", start, "to", end)
 
 	// Get the JSON response from the API
@@ -83,7 +85,7 @@ func (a *APOD) Range(start, end string) ([]*APODResponse, error) {
 	}
 
 	// Decode the JSON response
-	var responses []*APODResponse
+	var responses []*Response
 	err = json.NewDecoder(resp.Body).Decode(&responses)
 	if err != nil {
 		return nil, err
@@ -148,7 +150,7 @@ func (a *APOD) Fill() {
 }
 
 // Today gets today's APOD from the NASA API
-func (a *APOD) Today() (resp *APODResponse, err error) {
+func (a *APOD) Today() (resp *Response, err error) {
 	// Try tomorrow's date first
 	resp, err = a.Get(a.TomorrowsDate())
 	if err == ErrorDateNotFound {
@@ -190,12 +192,12 @@ func (a *APOD) RandomDate() string {
 	return start.Add(random).Format("2006-01-02")
 }
 
-// Gets a random APOD from the NASA API
-func (a *APOD) Random() (*APODResponse, error) {
+// Random gets a random APOD from the NASA API
+func (a *APOD) Random() (*Response, error) {
 	return a.Get(a.RandomDate())
 }
 
-// Checks if a date is valid
+// IsValidDate checks if a date is valid for apod.Get()
 func (a *APOD) IsValidDate(date string) bool {
 	// Check if the date is in the correct format
 	_, err := time.Parse("2006-01-02", date)
@@ -209,13 +211,13 @@ func (a *APOD) IsValidDate(date string) bool {
 	return d.After(start)
 }
 
-// Access the image cache through the APOD client
+// GetImage gets an image from the image cache
 func (a *APOD) GetImage(day string) (*ImageWrapper, bool) {
 	return a.ImageCache.Get(day)
 }
 
-// APODResponse is a single JSON response from the APOD API.
-type APODResponse struct {
+// Response is a single JSON response from the APOD API.
+type Response struct {
 	Title       string `json:"title"`
 	Date        string `json:"date"`
 	URL         string `json:"url"`
@@ -227,12 +229,12 @@ type APODResponse struct {
 	Service     string `json:"service_version"`
 }
 
-func (a *APODResponse) String() string {
+func (a *Response) String() string {
 	return fmt.Sprintf("Title: %s\nDate: %s\nURL: %s\nHDURL: %s\nMediaType: %s\nExplanation: %s\nThumbnail: %s\nCopyright: %s\nService: %s", a.Title, a.Date, a.URL, a.HDURL, a.MediaType, a.Explanation, a.Thumbnail, a.Copyright, a.Service)
 }
 
 // ToEmbed converts an APODResponse to an embed for Discord
-func (a *APODResponse) ToEmbed(image []byte, format string) (*discordgo.MessageEmbed, *discordgo.File) {
+func (a *Response) ToEmbed(image []byte, format string) (*discordgo.MessageEmbed, *discordgo.File) {
 	log.Println("Creating embed for", a.Date, "with format", format)
 
 	embed := &discordgo.MessageEmbed{
@@ -266,20 +268,21 @@ func (a *APODResponse) ToEmbed(image []byte, format string) (*discordgo.MessageE
 }
 
 // CreateExplanation creates a markdown formatted explanation of today's APOD
-func (a *APODResponse) CreateExplanation() string {
+func (a *Response) CreateExplanation() string {
 	return fmt.Sprintf("_%s_\n> %s", a.Title, a.Explanation)
 }
 
-func (a *APODResponse) DownloadRawImage() (*ImageWrapper, error) {
+// DownloadRawImage downloads the image without resizing
+func (a *Response) DownloadRawImage() (*ImageWrapper, error) {
 	log.Println("Downloading image for", a.Date)
 	if a.MediaType == "image" {
 		return downloadImage(a.HDURL)
-	} else {
-		return downloadImage(a.Thumbnail)
 	}
+	return downloadImage(a.Thumbnail)
 }
 
-func (a *APODResponse) DownloadSizedImage() (*ImageWrapper, error) {
+// DownloadSizedImage downloads the image and resizes it to be under the max size
+func (a *Response) DownloadSizedImage() (*ImageWrapper, error) {
 	img, err := a.DownloadRawImage()
 	if err != nil {
 		return img, err

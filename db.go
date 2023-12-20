@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// DB is the bot's database
 type DB struct {
 	sync.RWMutex
 	encoder *json.Encoder
@@ -17,11 +18,15 @@ type DB struct {
 	last map[string]string
 }
 
+// EventType enum
 type EventType int
 
 const (
+	// EventTypeSet is a set event (/schedule)
 	EventTypeSet EventType = iota
+	// EventTypeRemove is a remove event (/stop)
 	EventTypeRemove
+	// EventTypeSent is a sent event (APOD sent)
 	EventTypeSent
 )
 
@@ -38,11 +43,12 @@ func (e EventType) String() string {
 	return ""
 }
 
-// Define marshalling/unmarshalling for EventType
+// MarshalJSON for EventType
 func (e EventType) MarshalJSON() ([]byte, error) {
 	return json.Marshal(e.String())
 }
 
+// UnmarshalJSON for EventType
 func (e *EventType) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
@@ -63,31 +69,43 @@ func (e *EventType) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// Event is a database event
 type Event struct {
+	// Time is the time the event occurred
 	Time time.Time `json:"time"`
+	// Type is the type of event
 	Type EventType `json:"type"`
-	// /schedule
+	// Set is the set event (/schedule)
 	Set *SetEvent `json:"set,omitempty"`
-	// /stop
+	// Remove is the remove event (/stop)
 	Remove *RemoveEvent `json:"remove,omitempty"`
-	// tracks the last APOD sent to this channel
+	// Sent is the sent event (APOD sent)
 	Sent *SentEvent `json:"sent,omitempty"`
 }
 
+// SetEvent adds a channel to the schedule
 type SetEvent struct {
+	// ChannelID is the discord channel ID
 	ChannelID string `json:"channel_id"`
-	Hour      int    `json:"hour"`
+	// Hour is the hour (utc) to send the APOD message
+	Hour int `json:"hour"`
 }
 
+// RemoveEvent removes a channel from the schedule
 type RemoveEvent struct {
+	// ChannelID is the discord channel ID
 	ChannelID string `json:"channel_id"`
 }
 
+// SentEvent tracks the last APOD sent to a channel
 type SentEvent struct {
+	// ChannelID is the discord channel ID
 	ChannelID string `json:"channel_id"`
-	Date      string `json:"date"`
+	// Date is the date of the last APOD sent
+	Date string `json:"date"`
 }
 
+// NewDB creates a new DB
 func NewDB(r io.Reader, w io.Writer) (*DB, error) {
 	db := &DB{
 		encoder:  json.NewEncoder(w),
@@ -136,6 +154,7 @@ func (db *DB) sent(event *SentEvent) {
 	db.last[event.ChannelID] = event.Date
 }
 
+// Set adds a channel to the schedule
 func (db *DB) Set(channelID string, hour int) {
 	db.Lock()
 	event := &Event{
@@ -151,6 +170,7 @@ func (db *DB) Set(channelID string, hour int) {
 	db.Unlock()
 }
 
+// Remove removes a channel from the schedule
 func (db *DB) Remove(channelID string) {
 	db.Lock()
 	event := &Event{
@@ -165,6 +185,7 @@ func (db *DB) Remove(channelID string) {
 	db.Unlock()
 }
 
+// Sent tracks the last APOD sent to a channel
 func (db *DB) Sent(channelID, date string) {
 	db.Lock()
 	event := &Event{
@@ -180,7 +201,7 @@ func (db *DB) Sent(channelID, date string) {
 	db.Unlock()
 }
 
-// Removes entries that match a predicate
+// RemoveIf removes all entries that match the given predicate
 func (db *DB) RemoveIf(f func(string, int) bool) {
 	db.Lock()
 	for channelID, hour := range db.schedule {
@@ -199,7 +220,7 @@ func (db *DB) RemoveIf(f func(string, int) bool) {
 	db.Unlock()
 }
 
-// Iterates over all entries
+// View iterates over all entries in the database
 func (db *DB) View(f func(string, int)) {
 	db.RLock()
 	for channelID, hour := range db.schedule {
@@ -208,7 +229,7 @@ func (db *DB) View(f func(string, int)) {
 	db.RUnlock()
 }
 
-// Returns the number of entries
+// Size returns the number of entries in the database
 func (db *DB) Size() int {
 	db.RLock()
 	length := len(db.schedule)
@@ -216,7 +237,7 @@ func (db *DB) Size() int {
 	return length
 }
 
-// Returns the date of the last APOD sent to a channel
+// GetLast returns the date of the last APOD sent to a channel
 func (db *DB) GetLast(channelID string) (string, bool) {
 	db.RLock()
 	date, ok := db.last[channelID]

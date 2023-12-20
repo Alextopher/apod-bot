@@ -8,6 +8,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+// Bot is the discord bot
 type Bot struct {
 	db   *DB
 	apod *apod.APOD
@@ -26,7 +27,7 @@ func (b *Bot) SetOwner(ownerID string) error {
 	return nil
 }
 
-// Messages the bot's owner
+// MessageOwner sends a message to the bot's owner
 func (b *Bot) MessageOwner(msg string) error {
 	if b.owner == nil {
 		return nil
@@ -79,7 +80,7 @@ func (b *Bot) RunScheduler() {
 		sleepUntilNextHour()
 
 		// Prepare the message with retries
-		var res *apod.APODResponse
+		var res *apod.Response
 		var err error
 		backOff := time.Second
 

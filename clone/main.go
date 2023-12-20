@@ -33,7 +33,7 @@ func main() {
 		return
 	}
 
-	a := apod.NewAPOD(apodToken, cache, imageCache)
+	a := apod.NewClient(apodToken, cache, imageCache)
 
 	// Get all apods from 1995-06-16 to today
 	a.Fill()

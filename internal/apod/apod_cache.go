@@ -6,34 +6,35 @@ import (
 	"sync"
 )
 
-type APODCache interface {
+// Cache is a cache for APOD responses
+type Cache interface {
 	// Load loads data from a reader
 	Load(r io.Reader) error
 	// Add adds a single response to the cache
-	Add(response *APODResponse) error
+	Add(response *Response) error
 	// AddAll adds multiple responses to the cache
-	AddAll(responses []*APODResponse) error
+	AddAll(responses []*Response) error
 	// WriteAll writes the entire cache to a writer
 	WriteAll(w io.Writer) error
 	// Get gets a single response from the cache
-	Get(date string) (*APODResponse, bool)
+	Get(date string) (*Response, bool)
 	// Has checks if a response is in the cache
 	Has(date string) bool
 	// Size returns the number of responses in the cache
 	Size() int
 }
 
-// Saves APOD responses to an append-only file, and keeps a map of the responses in memory.
+// AppendOnly is an unconventional cache that only appends to a file
 type AppendOnly struct {
 	sync.RWMutex
-	cache   map[string]*APODResponse
+	cache   map[string]*Response
 	encoder *json.Encoder
 }
 
-// Helper function to create a new cache
+// NewAPODCache creates a new APODCache
 func NewAPODCache(r io.Reader, w io.Writer) (*AppendOnly, error) {
 	cache := &AppendOnly{
-		cache:   make(map[string]*APODResponse),
+		cache:   make(map[string]*Response),
 		encoder: json.NewEncoder(w),
 	}
 	if err := cache.Load(r); err != nil {
@@ -46,7 +47,7 @@ func NewAPODCache(r io.Reader, w io.Writer) (*AppendOnly, error) {
 func (c *AppendOnly) Load(r io.Reader) error {
 	dec := json.NewDecoder(r)
 	for {
-		var response *APODResponse
+		var response *Response
 		if err := dec.Decode(&response); err != nil {
 			if err == io.EOF {
 				break
@@ -58,8 +59,8 @@ func (c *AppendOnly) Load(r io.Reader) error {
 	return nil
 }
 
-// Adds a single day to the cache
-func (c *AppendOnly) Add(response *APODResponse) error {
+// Add a single day to the cache
+func (c *AppendOnly) Add(response *Response) error {
 	c.Lock()
 	c.cache[response.Date] = response
 	err := c.encoder.Encode(response)
@@ -67,8 +68,8 @@ func (c *AppendOnly) Add(response *APODResponse) error {
 	return err
 }
 
-// Adds multiple days to the cache
-func (c *AppendOnly) AddAll(responses []*APODResponse) error {
+// AddAll adds multiple days to the cache
+func (c *AppendOnly) AddAll(responses []*Response) error {
 	c.Lock()
 	for _, response := range responses {
 		// If the cache already has the response, skip it
@@ -86,7 +87,7 @@ func (c *AppendOnly) AddAll(responses []*APODResponse) error {
 	return nil
 }
 
-// Writes the entire cache to a writer
+// WriteAll writes out the entire cache to a writer
 func (c *AppendOnly) WriteAll(w io.Writer) error {
 	c.RLock()
 	encoder := json.NewEncoder(w)
@@ -100,8 +101,8 @@ func (c *AppendOnly) WriteAll(w io.Writer) error {
 	return nil
 }
 
-// Gets a single day from the cache
-func (c *AppendOnly) Get(date string) (*APODResponse, bool) {
+// Get a single day from the cache
+func (c *AppendOnly) Get(date string) (*Response, bool) {
 	c.RLock()
 	response, ok := c.cache[date]
 	c.RUnlock()

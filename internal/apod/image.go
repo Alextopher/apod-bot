@@ -7,8 +7,10 @@ import (
 	"log"
 	"net/http"
 
-	_ "image/gif"
 	"image/jpeg"
+
+	// Import additional image formats
+	_ "image/gif"
 	_ "image/png"
 )
 
@@ -36,6 +38,7 @@ func NewImageWrapper(buf []byte) (*ImageWrapper, error) {
 	}, err
 }
 
+// Resize modifies the image to be under the max size.
 func (i *ImageWrapper) Resize(maxBytes int) error {
 	if len(i.Bytes) <= maxBytes {
 		return nil
