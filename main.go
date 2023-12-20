@@ -1,17 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
-	"time"
+	"os/signal"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
-	bolt "go.etcd.io/bbolt"
-)
 
-var (
-	apod *APOD
+	"github.com/Alextopher/apod-bot/internal/apod"
 )
 
 func main() {
@@ -34,46 +32,62 @@ func main() {
 		return
 	}
 
-	// open the bolt key value store
-	db, err := bolt.Open("./apod.db", 0600, &bolt.Options{Timeout: time.Second})
-
+	// Create reader and writer for the database
+	f, err := os.OpenFile("apod.db", os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
-		log.Println("Error opening bolt db: ", err)
+		log.Println("Error opening apod.db: ", err)
 		return
 	}
-	defer db.Close()
+	defer f.Close()
 
-	// create the schedule bucket
-	db.Update(func(tx *bolt.Tx) error {
-		tx.CreateBucketIfNotExists([]byte("schedule"))
-		return nil
-	})
+	db, err := NewDB(f, f)
+	if err != nil {
+		log.Println("Error creating database: ", err)
+		return
+	}
 
-	apod = &APOD{
-		key:     apodToken,
+	// Connect to APOD API
+	cacheFile, err := os.OpenFile("apod.cache", os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		log.Println("Error opening apod.cache: ", err)
+		return
+	}
+
+	cache, err := apod.NewAPODCache(cacheFile, cacheFile)
+	if err != nil {
+		log.Println("Error creating cache: ", err)
+		return
+	}
+
+	imageCache, err := apod.NewDirectoryImageCache("images")
+	if err != nil {
+		log.Println("Error creating image cache: ", err)
+		return
+	}
+
+	bot := &Bot{
 		db:      db,
+		apod:    apod.NewAPOD(apodToken, cache, imageCache),
 		session: session,
 	}
 
+	// Set the bot's owner
+	if owner, ok := os.LookupEnv("OWNER"); ok {
+		err = bot.SetOwner(owner)
+		if err != nil {
+			log.Println("Error setting bot owner: ", err)
+			return
+		}
+	}
+
 	// cache the current APOD response
-	_, err = apod.Today()
+	_, err = bot.apod.Today()
 	if err != nil {
 		log.Println("Error caching APOD: ", err)
 	}
 
 	// number of scheduled APODs
-	scheduled := 0
-	apod.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("schedule"))
-		c := b.Cursor()
-
-		for k, _ := c.First(); k != nil; k, _ = c.Next() {
-			scheduled++
-		}
-
-		return nil
-	})
-	log.Println("Schedule size: ", scheduled)
+	log.Println("Schedule size: ", bot.db.Size())
 
 	var guilds []string
 	ch := make(chan struct{})
@@ -93,12 +107,7 @@ func main() {
 	<-ch
 
 	// Handle application commands
-	session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		if handler, ok := handlers[i.ApplicationCommandData().Name]; ok {
-			log.Println("Handling command: ", i.ApplicationCommandData().Name)
-			handler(s, i)
-		}
-	})
+	session.AddHandler(bot.handler)
 
 	// Announce when the bot joins a guild.
 	session.AddHandler(func(s *discordgo.Session, event *discordgo.GuildCreate) {
@@ -110,15 +119,29 @@ func main() {
 		}
 
 		log.Printf("Joined server: %s %q\n", event.ID, event.Name)
+		err = bot.MessageOwner(fmt.Sprintf("I was just added to %s %q", event.ID, event.Name))
+		if err != nil {
+			log.Println("Error messaging owner: ", err)
+		}
 	})
 
 	// Announce when the bot is removed from a guild.
 	session.AddHandler(func(s *discordgo.Session, event *discordgo.GuildDelete) {
-		if !event.Guild.Unavailable {
-			log.Println("Left server: ", event.ID)
+		log.Println("Left server: ", event.ID)
 
-			// update the bot to check it still has access to all channels
-			apod.UpdateSchedule()
+		// update the bot to check it still has access to all channels
+		bot.UpdateSchedule()
+		err = bot.MessageOwner(fmt.Sprintf("I was just removed from %s", event.ID))
+		if err != nil {
+			log.Println("Error messaging owner: ", err)
+		}
+
+		// remove the id from the list of guilds
+		for i, guild := range guilds {
+			if guild == event.ID {
+				guilds = append(guilds[:i], guilds[i+1:]...)
+				return
+			}
 		}
 	})
 
@@ -129,5 +152,10 @@ func main() {
 	}
 
 	log.Println("Bot is running. Press CTRL-C to exit.")
-	apod.RunScheduler()
+	go bot.RunScheduler()
+	go bot.apod.Fill()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+	<-stop
 }
