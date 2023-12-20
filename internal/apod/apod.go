@@ -103,7 +103,7 @@ func (a *APOD) Fill() {
 	// Must be after 1995-06-16 (first APOD)
 	start := time.Date(1995, 6, 16, 0, 0, 0, 0, time.UTC)
 	// Today's date
-	now := time.Now()
+	now := time.Now().UTC()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
 	// "Iterator" over every day from start to today
@@ -151,40 +151,20 @@ func (a *APOD) Fill() {
 
 // Today gets today's APOD from the NASA API
 func (a *APOD) Today() (resp *Response, err error) {
-	// Try tomorrow's date first
-	resp, err = a.Get(a.TomorrowsDate())
-	if err == ErrorDateNotFound {
-		// If tomorrow's date doesn't exist, try today's date
-		resp, err = a.Get(a.TodaysDate())
-		if err == ErrorDateNotFound {
-			// If today's date doesn't exist, try yesterday's date
-			resp, err = a.Get(a.YesterdaysDate())
-		}
-	}
-
+	resp, err = a.Get(a.TodaysDate())
 	return resp, err
-}
-
-// TomorrowsDate returns tomorrows date in the format for apod.Get()
-func (a *APOD) TomorrowsDate() string {
-	return time.Now().AddDate(0, 0, 1).Format("2006-01-02")
 }
 
 // TodaysDate return todays date in the format for apod.Get()
 func (a *APOD) TodaysDate() string {
-	return time.Now().Format("2006-01-02")
-}
-
-// YesterdaysDate returns yesterdays date in the format for apod.Get()
-func (a *APOD) YesterdaysDate() string {
-	return time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	return time.Now().UTC().Format("2006-01-02")
 }
 
 // RandomDate returns a random valid date for apod.Get()
 func (a *APOD) RandomDate() string {
 	// Must be after 1995-06-16 (first APOD) and before today
 	start := time.Date(1995, 6, 16, 0, 0, 0, 0, time.UTC)
-	end := time.Now()
+	end := time.Now().UTC()
 
 	// Get a random date between start and end
 	diff := end.Sub(start)
