@@ -96,7 +96,7 @@ func (b *Bot) RunScheduler() {
 
 		hour := time.Now().UTC().Hour()
 		b.db.View(func(channelID string, hourToSend int) {
-			if hour == hourToSend || true {
+			if hour == hourToSend {
 				log.Printf("scheduler: sending APOD to %s\n", channelID)
 
 				_, err = b.session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
