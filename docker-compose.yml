@@ -4,3 +4,4 @@ services:
     volumes:
       - ./apod.db:/usr/src/app/apod.db
       - ./apod.cache:/usr/src/app/apod.cache
+      - ./images:/usr/src/app/images
