@@ -6,15 +6,17 @@ import (
 	"io"
 	"net/http"
 
-	// Import additional image formats
-	_ "image/gif"
+	// Include jpeg image decoder
 	"image/jpeg"
+	// Include gif image decoder
+	_ "image/gif"
+	// Include png image decoder
 	_ "image/png"
 
 	"github.com/Alextopher/apod-bot/internal/cache"
 )
 
-// Creates a new ImageWrapper cache
+// NewImageCache simplifies the creation of an APOD image cache
 func NewImageCache(dir string) *cache.FSCache[*ImageWrapper] {
 	return cache.NewFSCache(
 		cache.NewLocalFS(dir),

@@ -58,11 +58,11 @@ func TestGet(t *testing.T) {
 		t.Error("Incorrect date")
 	}
 
-	if resp.Url != "https://apod.nasa.gov/apod/image/2107/PIA24542_fig2_1100c.jpg" {
+	if resp.URL != "https://apod.nasa.gov/apod/image/2107/PIA24542_fig2_1100c.jpg" {
 		t.Error("Incorrect URL")
 	}
 
-	if resp.HdUrl != "https://apod.nasa.gov/apod/image/2107/PIA24542_fig2.jpg" {
+	if resp.HdURL != "https://apod.nasa.gov/apod/image/2107/PIA24542_fig2.jpg" {
 		t.Error("Incorrect HDURL")
 	}
 

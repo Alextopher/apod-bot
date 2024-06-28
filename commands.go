@@ -18,8 +18,8 @@ var (
 )
 
 const (
-	None      = 0
-	Ephemeral = discordgo.MessageFlagsEphemeral
+	none      = 0
+	ephemeral = discordgo.MessageFlagsEphemeral
 )
 
 var commands = []*discordgo.ApplicationCommand{
@@ -78,12 +78,12 @@ var commands = []*discordgo.ApplicationCommand{
 func (bot *Bot) get(msg *Response, resp *apod.Response) {
 	embed, file := bot.ToEmbed(resp)
 	if embed == nil || file == nil {
-		msg.TextMessage("Error creating embed", Ephemeral)
+		msg.TextMessage("Error creating embed", ephemeral)
 		return
 	}
 
 	bot.db.Sent(msg.interaction.ChannelID, resp.Date)
-	err := msg.EmbedMessage(embed, file, None)
+	err := msg.EmbedMessage(embed, file, none)
 	if err != nil {
 		log.Println("Error sending message:", err)
 	}
@@ -95,27 +95,27 @@ func (bot *Bot) commandHandler(s *discordgo.Session, i *discordgo.InteractionCre
 
 	switch i.ApplicationCommandData().Name {
 	case "today":
-		msg := NewResponse(s, i.Interaction, None)
+		msg := NewResponse(s, i.Interaction, none)
 		resp, err := apod.Retry(func() (*apod.Response, error) {
 			return bot.apod.Today()
 		})
 		if err != nil {
-			msg.TextMessage("Error getting random APOD: "+err.Error(), Ephemeral)
+			msg.TextMessage("Error getting random APOD: "+err.Error(), ephemeral)
 			return
 		}
 		bot.get(msg, resp)
 	case "random":
-		msg := NewResponse(s, i.Interaction, None)
+		msg := NewResponse(s, i.Interaction, none)
 		resp, err := apod.Retry(func() (*apod.Response, error) {
 			return bot.apod.Random()
 		})
 		if err != nil {
-			msg.TextMessage("Error getting random APOD: "+err.Error(), Ephemeral)
+			msg.TextMessage("Error getting random APOD: "+err.Error(), ephemeral)
 			return
 		}
 		bot.get(msg, resp)
 	case "specific":
-		msg := NewResponse(s, i.Interaction, None)
+		msg := NewResponse(s, i.Interaction, none)
 
 		var date string
 		for _, option := range i.ApplicationCommandData().Options {
@@ -128,7 +128,7 @@ func (bot *Bot) commandHandler(s *discordgo.Session, i *discordgo.InteractionCre
 			return bot.apod.Get(date)
 		})
 		if err != nil {
-			msg.TextMessage("Error getting random APOD: "+err.Error(), Ephemeral)
+			msg.TextMessage("Error getting random APOD: "+err.Error(), ephemeral)
 			return
 		}
 		bot.get(msg, resp)
@@ -137,30 +137,30 @@ func (bot *Bot) commandHandler(s *discordgo.Session, i *discordgo.InteractionCre
 		var apod *apod.Response
 		var err error
 
-		msg := NewResponse(s, i.Interaction, None)
+		msg := NewResponse(s, i.Interaction, none)
 		if date, ok := bot.db.GetLast(i.ChannelID); ok {
 			apod, err = bot.apod.Get(date)
 			if err != nil {
-				msg.TextMessage("Sorry, I couldn't get the explanation for the last APOD", Ephemeral)
+				msg.TextMessage("Sorry, I couldn't get the explanation for the last APOD", ephemeral)
 				log.Println("Error getting explanation: ", err)
 				return
 			}
 		} else {
 			apod, err = bot.apod.Today()
 			if err != nil {
-				msg.TextMessage("Sorry, I couldn't get the explanation for today's APOD", Ephemeral)
+				msg.TextMessage("Sorry, I couldn't get the explanation for today's APOD", ephemeral)
 				log.Println("Error getting explanation: ", err)
 				return
 			}
 		}
 
-		msg.TextMessage(apod.CreateExplanation(), None)
+		msg.TextMessage(apod.CreateExplanation(), none)
 	case "schedule":
-		msg := NewResponse(s, i.Interaction, Ephemeral)
+		msg := NewResponse(s, i.Interaction, ephemeral)
 
 		allowed := i.Interaction.Member.Permissions&bitmask != 0
 		if !allowed {
-			msg.TextMessage("You must have \"Manage Server\" permissions or higher.", Ephemeral)
+			msg.TextMessage("You must have \"Manage Server\" permissions or higher.", ephemeral)
 			return
 		}
 
@@ -168,24 +168,24 @@ func (bot *Bot) commandHandler(s *discordgo.Session, i *discordgo.InteractionCre
 			if option.Name == "hour" {
 				hour := int(option.Value.(float64))
 				bot.db.Set(i.ChannelID, hour)
-				msg.TextMessage(fmt.Sprintf("Astronomy picture of the day will be sent daily at %d:00 UTC. Use `/stop` to stop", hour), None)
+				msg.TextMessage(fmt.Sprintf("Astronomy picture of the day will be sent daily at %d:00 UTC. Use `/stop` to stop", hour), none)
 				return
 			}
 		}
 	case "stop":
-		msg := NewResponse(s, i.Interaction, Ephemeral)
+		msg := NewResponse(s, i.Interaction, ephemeral)
 
 		allowed := i.Interaction.Member.Permissions&bitmask != 0
 		if !allowed {
-			msg.TextMessage("You must have \"Manage Server\" permissions or higher.", Ephemeral)
+			msg.TextMessage("You must have \"Manage Server\" permissions or higher.", ephemeral)
 			return
 		}
 
 		bot.db.Remove(i.ChannelID)
-		msg.TextMessage("This channels scheduled astronomy picture of the day will no longer be sent.", None)
+		msg.TextMessage("This channels scheduled astronomy picture of the day will no longer be sent.", none)
 	case "source":
-		msg := NewResponse(s, i.Interaction, None)
-		msg.TextMessage("https://github.com/Alextopher/apod-bot", None)
+		msg := NewResponse(s, i.Interaction, none)
+		msg.TextMessage("https://github.com/Alextopher/apod-bot", none)
 	default:
 		log.Println("Unknown command: ", i.ApplicationCommandData().Name)
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -200,7 +200,7 @@ func (bot *Bot) commandHandler(s *discordgo.Session, i *discordgo.InteractionCre
 	}
 }
 
-// CreateEmbed creates a discordgo.MessageEmbed from an APOD response
+// ToEmbed creates a discordgo.MessageEmbed from an APOD response
 func (bot *Bot) ToEmbed(a *apod.Response) (*discordgo.MessageEmbed, *discordgo.File) {
 	// Get the image and resize it for discord
 	image, err := bot.apod.GetImage(a.Date)
@@ -209,7 +209,7 @@ func (bot *Bot) ToEmbed(a *apod.Response) (*discordgo.MessageEmbed, *discordgo.F
 		return nil, nil
 	}
 
-	err = image.Resize(DiscordMaxImageSize)
+	err = image.Resize(discordMaxImageSize)
 	if err != nil {
 		log.Println("Error resizing image for", a.Date, ":", err)
 		return nil, nil
@@ -232,10 +232,10 @@ func (bot *Bot) ToEmbed(a *apod.Response) (*discordgo.MessageEmbed, *discordgo.F
 	}
 
 	if a.MediaType == "video" {
-		if a.HdUrl != "" {
-			embed.Description += "VIDEO: " + a.HdUrl
+		if a.HdURL != "" {
+			embed.Description += "VIDEO: " + a.HdURL
 		} else {
-			embed.Description += "VIDEO: " + a.Url
+			embed.Description += "VIDEO: " + a.URL
 		}
 	}
 

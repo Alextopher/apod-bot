@@ -8,7 +8,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-const DiscordMaxImageSize = 8 * 1024 * 1024
+const discordMaxImageSize = 8 * 1024 * 1024
 
 // Bot is the discord bot
 type Bot struct {

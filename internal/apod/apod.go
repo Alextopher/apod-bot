@@ -132,7 +132,7 @@ func (a *APOD) Get(date string) (response *Response, err error) {
 	return response, nil
 }
 
-// Returns the APOD response for today
+// Today gets the APOD response for today
 func (a *APOD) Today() (response *Response, err error) {
 	if a.current != nil && time.Since(a.lastUpdate) < time.Hour {
 		return a.current, nil
@@ -208,6 +208,7 @@ func (a *APOD) Fill() {
 	log.Println("Finished filling cache!!")
 }
 
+// Random gets a random APOD from the NASA API
 func (a *APOD) Random() (*Response, error) {
 	// Must be after 1995-06-16 (first APOD) and before today
 	start := time.Date(1995, 6, 16, 0, 0, 0, 0, time.UTC)

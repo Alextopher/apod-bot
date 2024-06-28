@@ -9,7 +9,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// Error for when a response has already been sent
+// ErrResponseSent for when a response has already been sent to an interaction
 var ErrResponseSent = errors.New("response has already been sent")
 
 // Response wraps a discord interaction to simplify sending messages
@@ -34,6 +34,7 @@ type Response struct {
 	defaultFlags discordgo.MessageFlags
 }
 
+// NewResponse creates a new response handler for an interaction
 func NewResponse(s *discordgo.Session, i *discordgo.Interaction, flags discordgo.MessageFlags) *Response {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -57,7 +58,7 @@ func NewResponse(s *discordgo.Session, i *discordgo.Interaction, flags discordgo
 	return r
 }
 
-// Defer's the response
+// Defer defers the response to the interaction to allow for longer processing times
 func (r *Response) Defer() error {
 	r.Lock()
 	defer r.Unlock()
@@ -92,15 +93,15 @@ func (r *Response) TextMessage(content string, flags discordgo.MessageFlags) err
 			Content: &content,
 		})
 		return err
-	} else {
-		return r.session.InteractionRespond(r.interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: content,
-				Flags:   flags,
-			},
-		})
 	}
+
+	return r.session.InteractionRespond(r.interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: content,
+			Flags:   flags,
+		},
+	})
 }
 
 // EmbedMessage responds to an interaction with an embed message, and files
@@ -121,14 +122,14 @@ func (r *Response) EmbedMessage(embed *discordgo.MessageEmbed, file *discordgo.F
 			Files:  []*discordgo.File{file},
 		})
 		return err
-	} else {
-		return r.session.InteractionRespond(r.interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Embeds: []*discordgo.MessageEmbed{embed},
-				Files:  []*discordgo.File{file},
-				Flags:  flags,
-			},
-		})
 	}
+
+	return r.session.InteractionRespond(r.interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{embed},
+			Files:  []*discordgo.File{file},
+			Flags:  flags,
+		},
+	})
 }
