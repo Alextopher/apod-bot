@@ -4,21 +4,33 @@ import (
 	"bytes"
 	"image"
 	"io"
-	"log"
 	"net/http"
-
-	"image/jpeg"
 
 	// Import additional image formats
 	_ "image/gif"
+	"image/jpeg"
 	_ "image/png"
+
+	"github.com/Alextopher/apod-bot/internal/cache"
 )
 
-// DiscordMaxImageSize is the maximum size (in bytes) of an image that can be sent to Discord
-const DiscordMaxImageSize = 8 * 1024 * 1024
+// Creates a new ImageWrapper cache
+func NewImageCache(dir string) *cache.FSCache[*ImageWrapper] {
+	return cache.NewFSCache(
+		cache.NewLocalFS(dir),
+		func(b []byte) (*ImageWrapper, error) {
+			return NewImageWrapper(b)
+		},
+		func(iw *ImageWrapper) ([]byte, error) {
+			return iw.Bytes, nil
+		},
+	)
+}
 
 // ImageWrapper is a wrapper around an image.Image that caches the image's
-// binary representation.
+// binary representation and format.
+//
+// This is useful for caching images in memory
 type ImageWrapper struct {
 	// Image is the decoded image
 	Image image.Image
@@ -38,13 +50,30 @@ func NewImageWrapper(buf []byte) (*ImageWrapper, error) {
 	}, err
 }
 
-// Resize modifies the image to be under the max size.
+// downloadImage creates a new ImageWrapper from an image URL.
+func downloadImage(url string) (*ImageWrapper, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewImageWrapper(body)
+}
+
+// Resize returns a new ImageWrapper with the original image converted to jpeg
+// and reduces quality until the image is under maxBytes.
 func (i *ImageWrapper) Resize(maxBytes int) error {
 	if len(i.Bytes) <= maxBytes {
 		return nil
 	}
 
-	// Re encode the image with lower quality until it is under the max size
+	// re-encode the image with lower quality until it is under the max size
 	for quality := 100; quality > 0; quality -= 5 {
 		buf := &bytes.Buffer{}
 		err := jpeg.Encode(buf, i.Image, &jpeg.Options{Quality: quality})
@@ -59,21 +88,4 @@ func (i *ImageWrapper) Resize(maxBytes int) error {
 	}
 
 	return nil
-}
-
-func downloadImage(url string) (*ImageWrapper, error) {
-	log.Println("Downloading image from", url)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewImageWrapper(body)
 }

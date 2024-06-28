@@ -2,11 +2,10 @@ package apod
 
 // Verify that api commands are working as expected
 import (
-	"io"
 	"os"
-	"strings"
 	"testing"
 
+	"github.com/Alextopher/apod-bot/internal/cache"
 	"github.com/joho/godotenv"
 )
 
@@ -21,13 +20,14 @@ func createAPITestAPOD() *APOD {
 	}
 
 	// Empty cache (reads and writes nothing)
-	cache, _ := NewAPODCache(strings.NewReader(""), io.Discard)
+	imageCache := NewImageCache("images")
+	apodCache := cache.NewEmptyCache[*Response]()
 
 	// Empty image cache (reads and writes nothing)
 	return &APOD{
 		key:        key,
-		cache:      cache,
-		ImageCache: NewNullImageCache(),
+		cache:      apodCache,
+		imageCache: imageCache,
 	}
 }
 
@@ -58,11 +58,11 @@ func TestGet(t *testing.T) {
 		t.Error("Incorrect date")
 	}
 
-	if resp.URL != "https://apod.nasa.gov/apod/image/2107/PIA24542_fig2_1100c.jpg" {
+	if resp.Url != "https://apod.nasa.gov/apod/image/2107/PIA24542_fig2_1100c.jpg" {
 		t.Error("Incorrect URL")
 	}
 
-	if resp.HDURL != "https://apod.nasa.gov/apod/image/2107/PIA24542_fig2.jpg" {
+	if resp.HdUrl != "https://apod.nasa.gov/apod/image/2107/PIA24542_fig2.jpg" {
 		t.Error("Incorrect HDURL")
 	}
 

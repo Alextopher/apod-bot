@@ -8,6 +8,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+const DiscordMaxImageSize = 8 * 1024 * 1024
+
 // Bot is the discord bot
 type Bot struct {
 	db   *DB
@@ -78,39 +80,24 @@ func (b *Bot) RunScheduler() {
 	b.UpdateSchedule()
 	for {
 		sleepUntilNextHour()
+		time.Sleep(time.Minute)
 
 		// Prepare the message with retries
-		var res *apod.Response
-		var err error
-		backOff := time.Second
-
-		for {
-			res, err = b.apod.Today()
-			if err == nil || backOff > time.Minute {
-				break
-			}
-
-			log.Printf("Message prepare failed %s trying again in %s\n", err, backOff)
-			time.Sleep(backOff)
-			backOff *= 2
-		}
+		res, err := apod.Retry(func() (*apod.Response, error) {
+			return b.apod.Today()
+		})
 
 		if err != nil {
-			log.Println("Message prepare failed after multiple retries", err)
-			break
+			log.Println("scheduler: error getting today's APOD:", err)
+			continue
 		}
 
-		wrapper, err := apod.GetOrSetImage(b.apod.ImageCache, res.Date, res.DownloadSizedImage)
-		if err != nil {
-			log.Println("Error downloading image:", err)
-			break
-		}
+		embed, file := b.ToEmbed(res)
 
-		embed, file := res.ToEmbed(wrapper.Bytes, wrapper.Format)
 		hour := time.Now().UTC().Hour()
 		b.db.View(func(channelID string, hourToSend int) {
-			if hour == hourToSend {
-				log.Println("Sending APOD message to " + channelID)
+			if hour == hourToSend || true {
+				log.Printf("scheduler: sending APOD to %s\n", channelID)
 
 				_, err = b.session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
 					Embeds: []*discordgo.MessageEmbed{embed},
@@ -118,7 +105,7 @@ func (b *Bot) RunScheduler() {
 				})
 
 				if err != nil {
-					log.Println("Error sending message:", err)
+					log.Println("scheduler: error sending message:", err)
 				} else {
 					b.db.Sent(channelID, res.Date)
 				}

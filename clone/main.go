@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/Alextopher/apod-bot/internal/apod"
+	"github.com/Alextopher/apod-bot/internal/cache"
 	"github.com/joho/godotenv"
 )
 
@@ -21,19 +22,14 @@ func main() {
 		return
 	}
 
-	cache, err := apod.NewAPODCache(cacheFile, cacheFile)
+	apodCache, err := cache.NewAppendCache[*apod.Response](cacheFile, cacheFile)
 	if err != nil {
 		log.Println("Error creating cache: ", err)
 		return
 	}
 
-	imageCache, err := apod.NewDirectoryImageCache("images")
-	if err != nil {
-		log.Println("Error creating image cache: ", err)
-		return
-	}
-
-	a := apod.NewClient(apodToken, cache, imageCache)
+	imageCache := apod.NewImageCache("images")
+	a := apod.NewClient(apodToken, apodCache, imageCache)
 
 	// Get all apods from 1995-06-16 to today
 	a.Fill()

@@ -10,6 +10,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/Alextopher/apod-bot/internal/apod"
+	"github.com/Alextopher/apod-bot/internal/cache"
 )
 
 func main() {
@@ -53,21 +54,16 @@ func main() {
 		return
 	}
 
-	cache, err := apod.NewAPODCache(cacheFile, cacheFile)
+	imageCache := apod.NewImageCache("images")
+	apodCache, err := cache.NewAppendCache[*apod.Response](cacheFile, cacheFile)
 	if err != nil {
 		log.Println("Error creating cache: ", err)
 		return
 	}
 
-	imageCache, err := apod.NewDirectoryImageCache("images")
-	if err != nil {
-		log.Println("Error creating image cache: ", err)
-		return
-	}
-
 	bot := &Bot{
 		db:      db,
-		apod:    apod.NewClient(apodToken, cache, imageCache),
+		apod:    apod.NewClient(apodToken, apodCache, imageCache),
 		session: session,
 	}
 
@@ -86,7 +82,7 @@ func main() {
 		log.Println("Error caching APOD: ", err)
 	}
 
-	// number of scheduled APODs
+	// number of scheduled jobs
 	log.Println("Schedule size: ", bot.db.Size())
 
 	var guilds []string
@@ -107,7 +103,7 @@ func main() {
 	<-ch
 
 	// Handle application commands
-	session.AddHandler(bot.handler)
+	session.AddHandler(bot.commandHandler)
 
 	// Announce when the bot joins a guild.
 	session.AddHandler(func(s *discordgo.Session, event *discordgo.GuildCreate) {

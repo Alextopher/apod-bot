@@ -1,15 +1,25 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/Alextopher/apod-bot/internal/apod"
 	"github.com/bwmarrin/discordgo"
 )
 
+// As of right now a user must have "Manage Server" permission (or higher) to use the bot.
+const bitmask = discordgo.PermissionManageServer | discordgo.PermissionAdministrator
+
 var (
 	zero = float64(0)
+)
+
+const (
+	None      = 0
+	Ephemeral = discordgo.MessageFlagsEphemeral
 )
 
 var commands = []*discordgo.ApplicationCommand{
@@ -64,63 +74,49 @@ var commands = []*discordgo.ApplicationCommand{
 	},
 }
 
-// Abstracts APOD Response commands "today", "random", and "date" using an
-// arbitrary function that returns an APODResponse and an error.
-func (bot *Bot) get(s *discordgo.Session, i *discordgo.InteractionCreate, date string) {
-	// Check if the date is valid and if not, send an error message.
-	if !bot.apod.IsValidDate(date) {
-		sendError(s, i, fmt.Errorf("\"%s\" is not a valid date. Use yyyy-mm-dd format, and choose a date after 1995-06-16", date))
+// Responds to an interaction with an APOD
+func (bot *Bot) get(msg *Response, resp *apod.Response) {
+	embed, file := bot.ToEmbed(resp)
+	if embed == nil || file == nil {
+		msg.TextMessage("Error creating embed", Ephemeral)
 		return
 	}
 
-	// Let the user know we are working on it.
-	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
-	})
-
+	bot.db.Sent(msg.interaction.ChannelID, resp.Date)
+	err := msg.EmbedMessage(embed, file, None)
 	if err != nil {
-		log.Println("failed to prepare response: ", err)
-		finalizeMessage(s, i, "Sorry, something went wrong!")
-		return
+		log.Println("Error sending message:", err)
 	}
-
-	today, err := bot.apod.Get(date)
-	if err != nil {
-		finalizeError(s, i, err)
-		return
-	}
-
-	wrapper, err := apod.GetOrSetImage(bot.apod.ImageCache, today.Date, today.DownloadSizedImage)
-	if err != nil {
-		finalizeError(s, i, err)
-		return
-	}
-
-	embed, file := today.ToEmbed(wrapper.Bytes, wrapper.Format)
-	_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-		Embeds: &[]*discordgo.MessageEmbed{embed},
-		Files:  []*discordgo.File{file},
-	})
-
-	if err != nil {
-		log.Println("sendEmbed error responding to interaction: ", err)
-	}
-
-	bot.db.Sent(i.ChannelID, today.Date)
 }
 
-// handler handles application commands, switching on the command name
-func (bot *Bot) handler(s *discordgo.Session, i *discordgo.InteractionCreate) {
+// commandHandler handles application commands, switching on the command name
+func (bot *Bot) commandHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	log.Println("Command: ", i.ApplicationCommandData().Name)
 
 	switch i.ApplicationCommandData().Name {
 	case "today":
-		date := bot.apod.TodaysDate()
-		bot.get(s, i, date)
+		msg := NewResponse(s, i.Interaction, None)
+		resp, err := apod.Retry(func() (*apod.Response, error) {
+			return bot.apod.Today()
+		})
+		if err != nil {
+			msg.TextMessage("Error getting random APOD: "+err.Error(), Ephemeral)
+			return
+		}
+		bot.get(msg, resp)
 	case "random":
-		date := bot.apod.RandomDate()
-		bot.get(s, i, date)
+		msg := NewResponse(s, i.Interaction, None)
+		resp, err := apod.Retry(func() (*apod.Response, error) {
+			return bot.apod.Random()
+		})
+		if err != nil {
+			msg.TextMessage("Error getting random APOD: "+err.Error(), Ephemeral)
+			return
+		}
+		bot.get(msg, resp)
 	case "specific":
+		msg := NewResponse(s, i.Interaction, None)
+
 		var date string
 		for _, option := range i.ApplicationCommandData().Options {
 			if option.Name == "date" {
@@ -128,31 +124,43 @@ func (bot *Bot) handler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			}
 		}
 
-		bot.get(s, i, date)
+		resp, err := apod.Retry(func() (*apod.Response, error) {
+			return bot.apod.Get(date)
+		})
+		if err != nil {
+			msg.TextMessage("Error getting random APOD: "+err.Error(), Ephemeral)
+			return
+		}
+		bot.get(msg, resp)
 	case "explanation":
 		// Get the last APOD sent to this channel
 		var apod *apod.Response
 		var err error
 
+		msg := NewResponse(s, i.Interaction, None)
 		if date, ok := bot.db.GetLast(i.ChannelID); ok {
 			apod, err = bot.apod.Get(date)
 			if err != nil {
-				sendError(s, i, err)
+				msg.TextMessage("Sorry, I couldn't get the explanation for the last APOD", Ephemeral)
+				log.Println("Error getting explanation: ", err)
 				return
 			}
 		} else {
 			apod, err = bot.apod.Today()
 			if err != nil {
-				sendError(s, i, err)
+				msg.TextMessage("Sorry, I couldn't get the explanation for today's APOD", Ephemeral)
+				log.Println("Error getting explanation: ", err)
 				return
 			}
 		}
 
-		sendMessage(s, i, apod.CreateExplanation())
+		msg.TextMessage(apod.CreateExplanation(), None)
 	case "schedule":
+		msg := NewResponse(s, i.Interaction, Ephemeral)
+
 		allowed := i.Interaction.Member.Permissions&bitmask != 0
 		if !allowed {
-			sendMessage(s, i, "You must have \"Manage Server\" permissions or higher.")
+			msg.TextMessage("You must have \"Manage Server\" permissions or higher.", Ephemeral)
 			return
 		}
 
@@ -160,21 +168,24 @@ func (bot *Bot) handler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			if option.Name == "hour" {
 				hour := int(option.Value.(float64))
 				bot.db.Set(i.ChannelID, hour)
-				sendMessage(s, i, fmt.Sprintf("Astronomy picture of the day will be sent daily at %d:00 UTC. Use `/stop` to stop", hour))
+				msg.TextMessage(fmt.Sprintf("Astronomy picture of the day will be sent daily at %d:00 UTC. Use `/stop` to stop", hour), None)
 				return
 			}
 		}
 	case "stop":
+		msg := NewResponse(s, i.Interaction, Ephemeral)
+
 		allowed := i.Interaction.Member.Permissions&bitmask != 0
 		if !allowed {
-			sendMessage(s, i, "You must have \"Manage Server\" permissions or higher.")
+			msg.TextMessage("You must have \"Manage Server\" permissions or higher.", Ephemeral)
 			return
 		}
 
 		bot.db.Remove(i.ChannelID)
-		sendMessage(s, i, "This channels scheduled astronomy picture of the day will no longer be sent.")
+		msg.TextMessage("This channels scheduled astronomy picture of the day will no longer be sent.", None)
 	case "source":
-		sendMessage(s, i, "https://github.com/Alextopher/apod-bot")
+		msg := NewResponse(s, i.Interaction, None)
+		msg.TextMessage("https://github.com/Alextopher/apod-bot", None)
 	default:
 		log.Println("Unknown command: ", i.ApplicationCommandData().Name)
 		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -189,49 +200,47 @@ func (bot *Bot) handler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 }
 
-// As of right now a user must have "Manage Server" permission (or higher) to use the bot.
-const bitmask = discordgo.PermissionManageServer | discordgo.PermissionAdministrator
+// CreateEmbed creates a discordgo.MessageEmbed from an APOD response
+func (bot *Bot) ToEmbed(a *apod.Response) (*discordgo.MessageEmbed, *discordgo.File) {
+	// Get the image and resize it for discord
+	image, err := bot.apod.GetImage(a.Date)
+	if err != nil {
+		log.Println("Error getting image for", a.Date, ":", err)
+		return nil, nil
+	}
 
-// sendMessage responds to a new interaction that hasn't been deferred
-func sendMessage(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
-	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: content,
+	err = image.Resize(DiscordMaxImageSize)
+	if err != nil {
+		log.Println("Error resizing image for", a.Date, ":", err)
+		return nil, nil
+	}
+
+	embed := &discordgo.MessageEmbed{
+		Title: a.Title,
+		Color: 0xFF0000,
+		Author: &discordgo.MessageEmbedAuthor{
+			Name: a.Copyright,
 		},
-	})
-
-	if err != nil {
-		log.Println("sendMessage error responding to interaction: ", err)
+		// a.Date is in the format yyyy-mm-dd
+		// but the url format is apyymmdd
+		Description: fmt.Sprintf("[%s](https://apod.nasa.gov/apod/ap%s.html)\n", a.Date, strings.Replace(a.Date, "-", "", -1)[2:]),
 	}
-}
 
-// finalizeMessage responds to a deferred interaction created with
-// "InteractionResponseDeferredChannelMessageWithSource"
-func finalizeMessage(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
-	_, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-		Content: &content,
-	})
-
-	if err != nil {
-		log.Println("finalizeMessage error responding to interaction: ", err)
+	filename := fmt.Sprintf("%s.%s", a.Date, image.Format)
+	embed.Image = &discordgo.MessageEmbedImage{
+		URL: fmt.Sprintf("attachment://%s", filename),
 	}
-}
 
-func sendError(s *discordgo.Session, i *discordgo.InteractionCreate, e error) {
-	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: e.Error(),
-			Flags:   discordgo.MessageFlagsEphemeral,
-		},
-	})
-
-	if err != nil {
-		log.Println("sendError error responding to interaction: ", err)
+	if a.MediaType == "video" {
+		if a.HdUrl != "" {
+			embed.Description += "VIDEO: " + a.HdUrl
+		} else {
+			embed.Description += "VIDEO: " + a.Url
+		}
 	}
-}
 
-func finalizeError(s *discordgo.Session, i *discordgo.InteractionCreate, e error) {
-	finalizeMessage(s, i, e.Error())
+	return embed, &discordgo.File{
+		Name:   filename,
+		Reader: bytes.NewReader(image.Bytes),
+	}
 }
